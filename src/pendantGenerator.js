@@ -42,6 +42,18 @@ function createRoundedRectShape(width, height, radius) {
 }
 
 
+function createConnectorCurve(start, end, sagAmount, tubeRadius, material) {
+  // Create a curved tube between two points with a slight downward sag
+  const mid = new THREE.Vector3(
+    (start.x + end.x) / 2,
+    Math.min(start.y, end.y) - sagAmount,
+    (start.z + end.z) / 2
+  );
+  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+  const tubeGeo = new THREE.TubeGeometry(curve, 20, tubeRadius, 8, false);
+  return new THREE.Mesh(tubeGeo, material);
+}
+
 export async function generatePendant(params, materialKey = 'gold', chainInfo = null) {
   const {
     text,
@@ -120,40 +132,57 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   if (chainInfo) {
     const { tipLeft, tipRight, chainThickness } = chainInfo;
 
-    // Attach to whichever chain tip hangs lowest
-    const attachTip = tipLeft.y < tipRight.y ? tipLeft : tipRight;
+    // --- Bail loop at top of pendant ---
+    const bailRadius = chainThickness * 1.5;
+    const bailTube = chainThickness * 0.35;
+    const bailCenterY = pendantTop + bailRadius;
 
-    // Bail loop at the top of the pendant, sized to interlock with chain links.
-    // Rotated 90° around X so it sits in the XZ plane (perpendicular to the
-    // flat chain links in XY), creating an interlocking connection.
-    const bailRadius = chainThickness * 1.4;
-    const bailTube = chainThickness * 0.3;
-
-    // Bail sits just above the plate's top edge (in local coords before flip)
-    const bailLocalY = pendantTop + bailRadius * 0.6;
-
-    // Create bail torus in XZ plane
     const bailGeo = new THREE.TorusGeometry(bailRadius, bailTube, 12, 24);
-    bailGeo.rotateX(Math.PI / 2);
-    bailGeo.translate(0, bailLocalY, 0);
+    bailGeo.translate(0, bailCenterY, 0);
     const bailMesh = new THREE.Mesh(bailGeo, material.clone());
     group.add(bailMesh);
 
-    // Flip the entire pendant 180° so it sits upside-down inside the chain loop.
-    // The bail (originally at top) moves to the bottom and connects to the chain tip.
-    // The plate goes upward into the interior of the chain's horseshoe shape.
-    group.rotation.z = Math.PI;
+    // --- Position pendant centered between both tips, below them ---
+    const midX = (tipLeft.x + tipRight.x) / 2;
+    const lowestTipY = Math.min(tipLeft.y, tipRight.y);
+    // Place pendant so the top of the bail meets the lowest tip level
+    const pendantCenterY = lowestTipY - bailCenterY - bailRadius;
 
-    // After 180° flip, the bail is at local (0, -bailLocalY).
-    // Position so the bail center aligns with the chain tip.
-    const pendantCenterX = attachTip.x;
-    const pendantCenterY = attachTip.y + bailLocalY;
+    // --- V-shaped connector modifier piece ---
+    // Two curved tubes from each chain tip down to the bail top.
+    // All coordinates are in world space; since pendant group is at
+    // (midX, pendantCenterY), convert bail position to world.
+    const bailWorldX = midX;
+    const bailWorldY = pendantCenterY + bailCenterY + bailRadius;  // top of bail ring
+    const connTube = bailTube * 0.9;
+
+    // Left connector: from left chain tip to top of bail
+    const leftStart = new THREE.Vector3(
+      tipLeft.x - midX, tipLeft.y - pendantCenterY, 0
+    );
+    const leftEnd = new THREE.Vector3(
+      0, bailCenterY + bailRadius, 0
+    );
+    const sagL = Math.abs(tipLeft.x - midX) * 0.08;
+    const leftConn = createConnectorCurve(leftStart, leftEnd, sagL, connTube, material.clone());
+    group.add(leftConn);
+
+    // Right connector: from right chain tip to top of bail
+    const rightStart = new THREE.Vector3(
+      tipRight.x - midX, tipRight.y - pendantCenterY, 0
+    );
+    const rightEnd = new THREE.Vector3(
+      0, bailCenterY + bailRadius, 0
+    );
+    const sagR = Math.abs(tipRight.x - midX) * 0.08;
+    const rightConn = createConnectorCurve(rightStart, rightEnd, sagR, connTube, material.clone());
+    group.add(rightConn);
 
     return {
       group,
       width: plateW,
       height: plateH,
-      pendantCenterX,
+      pendantCenterX: midX,
       pendantCenterY,
       tipLeft,
       tipRight
@@ -173,6 +202,7 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     group,
     width: plateW,
     height: plateH + bailRadius * 2,
+    pendantCenterX: 0,
     pendantCenterY: 0,
     tipLeft: null,
     tipRight: null
