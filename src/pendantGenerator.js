@@ -120,26 +120,34 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   if (chainInfo) {
     const { tipLeft, tipRight, chainThickness } = chainInfo;
 
-    // Connect the pendant to the left chain tip (the lowest open loop).
-    // Position the pendant so its bail sits right at the tip, interlocking
-    // with the last chain link — no long connectors.
+    // Attach to whichever chain tip hangs lowest
     const attachTip = tipLeft.y < tipRight.y ? tipLeft : tipRight;
 
-    // Bail sized to match chain link proportions
-    const bailRadius = chainThickness * 1.0;
-    const bailTube = chainThickness * 0.35;
+    // Bail loop at the top of the pendant, sized to interlock with chain links.
+    // Rotated 90° around X so it sits in the XZ plane (perpendicular to the
+    // flat chain links in XY), creating an interlocking connection.
+    const bailRadius = chainThickness * 1.4;
+    const bailTube = chainThickness * 0.3;
 
-    // The bail sits at the top of the pendant plate.
-    // Position pendant so the bail center aligns with the chain tip.
-    const bailLocalY = pendantTop + bailRadius;
-    const pendantCenterX = attachTip.x;
-    const pendantCenterY = attachTip.y - bailLocalY;
+    // Bail sits just above the plate's top edge (in local coords before flip)
+    const bailLocalY = pendantTop + bailRadius * 0.6;
 
-    // Create bail (flat torus lying in XY plane) at the top of the pendant
-    const bailGeo = new THREE.TorusGeometry(bailRadius, bailTube, 8, 24);
-    bailGeo.translate(0, bailLocalY, attachTip.z);
+    // Create bail torus in XZ plane
+    const bailGeo = new THREE.TorusGeometry(bailRadius, bailTube, 12, 24);
+    bailGeo.rotateX(Math.PI / 2);
+    bailGeo.translate(0, bailLocalY, 0);
     const bailMesh = new THREE.Mesh(bailGeo, material.clone());
     group.add(bailMesh);
+
+    // Flip the entire pendant 180° so it sits upside-down inside the chain loop.
+    // The bail (originally at top) moves to the bottom and connects to the chain tip.
+    // The plate goes upward into the interior of the chain's horseshoe shape.
+    group.rotation.z = Math.PI;
+
+    // After 180° flip, the bail is at local (0, -bailLocalY).
+    // Position so the bail center aligns with the chain tip.
+    const pendantCenterX = attachTip.x;
+    const pendantCenterY = attachTip.y + bailLocalY;
 
     return {
       group,
