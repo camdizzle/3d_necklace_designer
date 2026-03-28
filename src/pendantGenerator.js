@@ -41,7 +41,6 @@ function createRoundedRectShape(width, height, radius) {
   return shape;
 }
 
-
 export async function generatePendant(params, materialKey = 'gold', chainInfo = null) {
   const {
     text,
@@ -114,49 +113,46 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   group.add(plateMesh);
   group.add(textMesh);
 
-  // Determine pendant dimensions for positioning
   const pendantTop = plateH / 2;
 
   if (chainInfo) {
-    const { tipLeft, tipRight, chainThickness } = chainInfo;
+    const { innerTopY, innerBottomY, chainThickness } = chainInfo;
 
-    // Attach to whichever chain tip hangs lowest
-    const attachTip = tipLeft.y < tipRight.y ? tipLeft : tipRight;
+    // --- Bail loop at top of pendant ---
+    const bailRadius = chainThickness * 0.8;
+    const bailTube = chainThickness * 0.25;
+    const bailCenterY = pendantTop + bailRadius;
+    const bailTop = bailCenterY + bailRadius;
 
-    // Bail loop at the top of the pendant, sized to interlock with chain links.
-    // Rotated 90° around X so it sits in the XZ plane (perpendicular to the
-    // flat chain links in XY), creating an interlocking connection.
-    const bailRadius = chainThickness * 1.4;
-    const bailTube = chainThickness * 0.3;
-
-    // Bail sits just above the plate's top edge (in local coords before flip)
-    const bailLocalY = pendantTop + bailRadius * 0.6;
-
-    // Create bail torus in XZ plane
     const bailGeo = new THREE.TorusGeometry(bailRadius, bailTube, 12, 24);
-    bailGeo.rotateX(Math.PI / 2);
-    bailGeo.translate(0, bailLocalY, 0);
+    bailGeo.translate(0, bailCenterY, 0);
     const bailMesh = new THREE.Mesh(bailGeo, material.clone());
     group.add(bailMesh);
 
-    // Flip the entire pendant 180° so it sits upside-down inside the chain loop.
-    // The bail (originally at top) moves to the bottom and connects to the chain tip.
-    // The plate goes upward into the interior of the chain's horseshoe shape.
-    group.rotation.z = Math.PI;
+    // --- Position pendant so bail top is near the chain inner edge ---
+    // Short connector bar bridges the small gap from bail to chain.
+    const connGap = chainThickness * 0.5;  // small gap between bail and chain
+    const pendantCenterY = innerTopY - bailTop - connGap;
 
-    // After 180° flip, the bail is at local (0, -bailLocalY).
-    // Position so the bail center aligns with the chain tip.
-    const pendantCenterX = attachTip.x;
-    const pendantCenterY = attachTip.y + bailLocalY;
+    // Connector from bail top to chain inner edge
+    const connLocalBottom = bailTop;
+    const connLocalTop = innerTopY - pendantCenterY;
+    const connHeight = connLocalTop - connLocalBottom;
+
+    if (connHeight > 0) {
+      const connWidth = bailTube * 2.5;
+      const connDepth = chainThickness * 0.8;
+      const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
+      connGeo.translate(0, connLocalBottom + connHeight / 2, 0);
+      const connMesh = new THREE.Mesh(connGeo, material.clone());
+      group.add(connMesh);
+    }
 
     return {
       group,
       width: plateW,
       height: plateH,
-      pendantCenterX,
-      pendantCenterY,
-      tipLeft,
-      tipRight
+      pendantCenterY
     };
   }
 
@@ -173,9 +169,7 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     group,
     width: plateW,
     height: plateH + bailRadius * 2,
-    pendantCenterY: 0,
-    tipLeft: null,
-    tipRight: null
+    pendantCenterY: 0
   };
 }
 
