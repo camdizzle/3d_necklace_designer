@@ -41,7 +41,25 @@ function createRoundedRectShape(width, height, radius) {
   return shape;
 }
 
-export async function generatePendant(params, materialKey = 'gold') {
+function createConnectorBar(start, end, width, depth) {
+  const dir = new THREE.Vector3().subVectors(end, start);
+  const length = dir.length();
+  const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+  // Create a box for the connector
+  const barGeo = new THREE.BoxGeometry(width, length, depth);
+
+  // Rotate to align with the direction
+  const angle = Math.atan2(dir.x, dir.y);
+  barGeo.rotateZ(-angle);
+
+  // Position at midpoint
+  barGeo.translate(midpoint.x, midpoint.y, midpoint.z);
+
+  return barGeo;
+}
+
+export async function generatePendant(params, materialKey = 'gold', chainInfo = null) {
   const {
     text,
     font: fontKey,
@@ -83,7 +101,6 @@ export async function generatePendant(params, materialKey = 'gold') {
   const textBox = textGeo.boundingBox;
   const textWidth = textBox.max.x - textBox.min.x;
   const textHeight = textBox.max.y - textBox.min.y;
-  const textDepth = textBox.max.z - textBox.min.z;
 
   // Center the text geometry
   textGeo.translate(
@@ -93,7 +110,7 @@ export async function generatePendant(params, materialKey = 'gold') {
   );
 
   const textMesh = new THREE.Mesh(textGeo, material);
-  textMesh.position.z = plateThickness; // Sit on top of plate
+  textMesh.position.z = plateThickness;
 
   // Create backing plate
   const plateW = textWidth + platePadding * 2;
@@ -106,30 +123,70 @@ export async function generatePendant(params, materialKey = 'gold') {
     bevelSize: 0.5,
     bevelSegments: 2
   });
-  plateGeo.computeBoundingBox();
-  // Center plate in Z
   plateGeo.translate(0, 0, -0.5);
 
   const plateMesh = new THREE.Mesh(plateGeo, material.clone());
   plateMesh.material.roughness = mat.roughness + 0.1;
 
-  // Create bail (the loop that connects pendant to chain)
+  group.add(plateMesh);
+  group.add(textMesh);
+
+  // Determine pendant dimensions for positioning
+  const pendantTop = plateH / 2;
+  const pendantAttachLeft = new THREE.Vector3(-plateW / 2, pendantTop, extrudeDepth / 2);
+  const pendantAttachRight = new THREE.Vector3(plateW / 2, pendantTop, extrudeDepth / 2);
+
+  // If chain info provided, create connector bars from chain tips to pendant
+  if (chainInfo) {
+    const { tipLeft, tipRight, chainThickness } = chainInfo;
+    const barWidth = Math.max(chainThickness, 6);
+    const barDepth = chainThickness;
+
+    // Connectors go from chain tips down to pendant top corners
+    // These positions are in world space — we need them relative to the group
+    // The group will be positioned so the pendant center is between the tips
+    const pendantCenterY = (tipLeft.y + tipRight.y) / 2 - pendantTop - barWidth * 1.5;
+
+    // Left connector: from tipLeft to pendant top-left
+    const leftStart = new THREE.Vector3(tipLeft.x, tipLeft.y - pendantCenterY, tipLeft.z);
+    const leftEnd = new THREE.Vector3(-plateW / 2, pendantTop, tipLeft.z);
+    const leftBarGeo = createConnectorBar(leftStart, leftEnd, barWidth, barDepth);
+    const leftBar = new THREE.Mesh(leftBarGeo, material.clone());
+    group.add(leftBar);
+
+    // Right connector: from tipRight to pendant top-right
+    const rightStart = new THREE.Vector3(tipRight.x, tipRight.y - pendantCenterY, tipRight.z);
+    const rightEnd = new THREE.Vector3(plateW / 2, pendantTop, tipRight.z);
+    const rightBarGeo = createConnectorBar(rightStart, rightEnd, barWidth, barDepth);
+    const rightBar = new THREE.Mesh(rightBarGeo, material.clone());
+    group.add(rightBar);
+
+    return {
+      group,
+      width: plateW,
+      height: plateH,
+      pendantCenterY,
+      tipLeft,
+      tipRight
+    };
+  }
+
+  // Fallback: standalone bail if no chain info
   const bailRadius = Math.min(plateW * 0.08, 6);
   const bailTubeRadius = bailRadius * 0.4;
   const bailGeo = new THREE.TorusGeometry(bailRadius, bailTubeRadius, 8, 16);
   const bailMesh = new THREE.Mesh(bailGeo, material.clone());
   bailMesh.position.y = plateH / 2 + bailRadius * 0.6;
   bailMesh.position.z = plateThickness / 2;
-
-  group.add(plateMesh);
-  group.add(textMesh);
   group.add(bailMesh);
 
   return {
     group,
     width: plateW,
     height: plateH + bailRadius * 2,
-    bailTop: plateH / 2 + bailRadius * 1.6
+    pendantCenterY: 0,
+    tipLeft: null,
+    tipRight: null
   };
 }
 
