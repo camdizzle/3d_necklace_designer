@@ -22,8 +22,8 @@ async function init() {
     chainMesh = chain.mesh;
     chainSize = chain.size;
     chainInfo = {
-      tipLeft: chain.tipLeft,
-      tipRight: chain.tipRight,
+      innerTopY: chain.innerTopY,
+      innerBottomY: chain.innerBottomY,
       chainThickness: chain.chainThickness
     };
     scene.add(chainMesh);
@@ -39,12 +39,11 @@ async function init() {
 
 function frameCamera() {
   const scale = chainMesh.scale.x;
-  const viewHeight = Math.max(chainSize.x, chainSize.y) * scale * 1.6;
+  const viewSize = Math.max(chainSize.x, chainSize.y) * scale * 1.3;
   const fov = camera.fov * (Math.PI / 180);
-  const distance = viewHeight / (2 * Math.tan(fov / 2));
+  const distance = viewSize / (2 * Math.tan(fov / 2));
   camera.position.set(0, 0, distance);
-  // Center camera slightly above middle since pendant hangs below chain
-  controls.target.set(0, -chainSize.y * scale * 0.15, 0);
+  controls.target.set(0, 0, 0);
   controls.update();
 }
 
@@ -60,11 +59,10 @@ async function rebuildPendant(state) {
     pendantGroup = null;
   }
 
-  // Scale chain info tips by current chain scale
   const scale = state.chainScale;
   const scaledChainInfo = chainInfo ? {
-    tipLeft: chainInfo.tipLeft.clone().multiplyScalar(scale),
-    tipRight: chainInfo.tipRight.clone().multiplyScalar(scale),
+    innerTopY: chainInfo.innerTopY * scale,
+    innerBottomY: chainInfo.innerBottomY * scale,
     chainThickness: chainInfo.chainThickness * scale
   } : null;
 
@@ -83,10 +81,8 @@ async function rebuildPendant(state) {
 
   pendantGroup = result.group;
 
-  // Position pendant centered between chain tips
-  if (result.pendantCenterX !== undefined) {
-    pendantGroup.position.set(result.pendantCenterX, result.pendantCenterY, 0);
-  }
+  // Position pendant centered in the chain loop
+  pendantGroup.position.set(0, result.pendantCenterY, 0);
 
   scene.add(pendantGroup);
 }

@@ -2,60 +2,40 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { MATERIALS } from './constants.js';
 
-function findChainTips(geometry) {
+function findChainAttachPoint(geometry) {
   const pos = geometry.attributes.position;
   const count = pos.count;
 
-  // Find bounding box
-  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-  for (let i = 0; i < count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    if (x < xMin) xMin = x;
-    if (x > xMax) xMax = x;
-    if (y < yMin) yMin = y;
-    if (y > yMax) yMax = y;
-  }
-
-  // The STL is already in necklace orientation: arc at top (+Y), two open tips at bottom (-Y).
-  // The left tip is at negative X (bottom-left), the right tip at positive X (bottom-right).
-  // First pass: find the lowest Y on each side to locate the actual last link.
-  let leftMinY = Infinity, rightMinY = Infinity;
-  for (let i = 0; i < count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    if (x < 0 && y < leftMinY) leftMinY = y;
-    if (x >= 0 && y < rightMinY) rightMinY = y;
-  }
-
-  // Collect vertices within 6 units of each side's lowest point (the last link)
-  const tipRange = 6;
-  const leftTipVerts = [];
-  const rightTipVerts = [];
+  // The chain is a closed loop. Find the interior space by scanning vertices
+  // near X=0 and finding the largest gap in Y — that's the open interior.
+  const xTolerance = 12;
+  const yVals = [];
 
   for (let i = 0; i < count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
-    const z = pos.getZ(i);
-    if (x < 0 && y < leftMinY + tipRange) {
-      leftTipVerts.push(new THREE.Vector3(x, y, z));
+    if (Math.abs(x) < xTolerance) {
+      yVals.push(y);
     }
-    if (x >= 0 && y < rightMinY + tipRange) {
-      rightTipVerts.push(new THREE.Vector3(x, y, z));
+  }
+  yVals.sort((a, b) => a - b);
+
+  // Find the largest gap — that's the interior of the chain loop
+  let maxGap = 0, gapStart = 0, gapEnd = 0;
+  for (let i = 1; i < yVals.length; i++) {
+    const gap = yVals[i] - yVals[i - 1];
+    if (gap > maxGap) {
+      maxGap = gap;
+      gapStart = yVals[i - 1];  // inner bottom (top of bottom chain band)
+      gapEnd = yVals[i];        // inner top (bottom of top chain band)
     }
   }
 
-  function centroid(verts) {
-    const c = new THREE.Vector3();
-    verts.forEach(v => c.add(v));
-    c.divideScalar(verts.length);
-    return c;
-  }
-
-  const tipLeft = leftTipVerts.length > 0 ? centroid(leftTipVerts) : new THREE.Vector3(xMin, yMin, 0);
-  const tipRight = rightTipVerts.length > 0 ? centroid(rightTipVerts) : new THREE.Vector3(xMax, yMin, 0);
-
-  return { tipLeft, tipRight };
+  return {
+    attachPoint: new THREE.Vector3(0, gapEnd, 0),
+    innerTopY: gapEnd,
+    innerBottomY: gapStart
+  };
 }
 
 export function loadChain(materialKey = 'gold') {
@@ -63,13 +43,12 @@ export function loadChain(materialKey = 'gold') {
     const loader = new STLLoader();
 
     loader.load(
-      '/ChainMakerChain.stl',
+      '/chain_loop.stl',
       (geometry) => {
         geometry.computeVertexNormals();
         geometry.center();
 
-        // Find tip positions (in centered coords)
-        const tips = findChainTips(geometry);
+        const attach = findChainAttachPoint(geometry);
 
         const mat = MATERIALS[materialKey];
         const material = new THREE.MeshStandardMaterial({
@@ -80,7 +59,6 @@ export function loadChain(materialKey = 'gold') {
         });
 
         const mesh = new THREE.Mesh(geometry, material);
-        // No rotation needed — the STL is already in necklace orientation
 
         const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
         const size = box.getSize(new THREE.Vector3());
@@ -89,8 +67,9 @@ export function loadChain(materialKey = 'gold') {
           mesh,
           geometry,
           size,
-          tipLeft: tips.tipLeft,
-          tipRight: tips.tipRight,
+          attachPoint: attach.attachPoint,
+          innerTopY: attach.innerTopY,
+          innerBottomY: attach.innerBottomY,
           chainThickness: size.z
         });
       },
