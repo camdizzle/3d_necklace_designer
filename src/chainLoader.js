@@ -19,8 +19,17 @@ function findChainTips(geometry) {
 
   // The STL is already in necklace orientation: arc at top (+Y), two open tips at bottom (-Y).
   // The left tip is at negative X (bottom-left), the right tip at positive X (bottom-right).
-  // Collect vertices near the bottom (lowest Y) on each side of center (X=0).
-  const yThreshold = yMin + (yMax - yMin) * 0.15; // bottom 15%
+  // First pass: find the lowest Y on each side to locate the actual last link.
+  let leftMinY = Infinity, rightMinY = Infinity;
+  for (let i = 0; i < count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    if (x < 0 && y < leftMinY) leftMinY = y;
+    if (x >= 0 && y < rightMinY) rightMinY = y;
+  }
+
+  // Collect vertices within 6 units of each side's lowest point (the last link)
+  const tipRange = 6;
   const leftTipVerts = [];
   const rightTipVerts = [];
 
@@ -28,12 +37,11 @@ function findChainTips(geometry) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
-    if (y < yThreshold) {
-      if (x < 0) {
-        leftTipVerts.push(new THREE.Vector3(x, y, z));
-      } else {
-        rightTipVerts.push(new THREE.Vector3(x, y, z));
-      }
+    if (x < 0 && y < leftMinY + tipRange) {
+      leftTipVerts.push(new THREE.Vector3(x, y, z));
+    }
+    if (x >= 0 && y < rightMinY + tipRange) {
+      rightTipVerts.push(new THREE.Vector3(x, y, z));
     }
   }
 
