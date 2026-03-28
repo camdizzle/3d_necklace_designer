@@ -215,11 +215,16 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
       group.add(connMesh);
     }
 
+    // Compute default Z to align plate center with chain center (Z=0)
+    const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
+    const defaultZ = -plateMidZ;
+
     return {
       group,
       width: plateW,
       height: plateH,
-      pendantCenterY
+      pendantCenterY,
+      defaultZ
     };
   }
 
@@ -227,7 +232,8 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     group,
     width: plateW,
     height: plateH,
-    pendantCenterY: 0
+    pendantCenterY: 0,
+    defaultZ: 0
   };
 }
 

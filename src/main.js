@@ -82,14 +82,32 @@ async function rebuildPendant(state) {
 
   pendantGroup = result.group;
 
-  // Position pendant centered in the chain loop
-  pendantGroup.position.set(0, result.pendantCenterY, 0);
+  // Scale pendant
+  const ps = state.pendantScale;
+  pendantGroup.scale.setScalar(ps);
+
+  // Position pendant centered in the chain loop, with Z flush to chain
+  const baseZ = result.defaultZ || 0;
+  pendantGroup.position.set(
+    state.pendantOffsetX,
+    result.pendantCenterY + state.pendantOffsetY,
+    baseZ + state.pendantOffsetZ
+  );
 
   scene.add(pendantGroup);
 }
 
 // UI
 const state = initUI(async (newState, changedKey) => {
+  if (['pendantOffsetX', 'pendantOffsetY', 'pendantOffsetZ', 'pendantScale'].includes(changedKey)) {
+    // Quick update without rebuild — just reposition/rescale
+    if (pendantGroup) {
+      pendantGroup.scale.setScalar(newState.pendantScale);
+      // Need the stored pendantCenterY and defaultZ — rebuild for simplicity
+      await rebuildPendant(newState);
+    }
+    return;
+  }
   if (changedKey === 'chainScale') {
     chainMesh.scale.setScalar(newState.chainScale);
     await rebuildPendant(newState);
