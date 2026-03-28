@@ -43,6 +43,7 @@ export const DEFAULTS = {
   platePadding: 8,
   plateRadius: 5,
   plateThickness: 3,
+  pendantShape: 'rectangle',
   chainScale: 1.0,
   material: 'gold'
 };

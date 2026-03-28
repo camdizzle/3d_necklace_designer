@@ -22,23 +22,75 @@ function loadFont(fontKey) {
   });
 }
 
-function createRoundedRectShape(width, height, radius) {
+function createPlateShape(shapeType, width, height, radius) {
   const shape = new THREE.Shape();
-  const r = Math.min(radius, width / 2, height / 2);
-  const x = -width / 2;
-  const y = -height / 2;
+  const hw = width / 2;
+  const hh = height / 2;
 
-  shape.moveTo(x + r, y);
-  shape.lineTo(x + width - r, y);
-  shape.quadraticCurveTo(x + width, y, x + width, y + r);
-  shape.lineTo(x + width, y + height - r);
-  shape.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  shape.lineTo(x + r, y + height);
-  shape.quadraticCurveTo(x, y + height, x, y + height - r);
-  shape.lineTo(x, y + r);
-  shape.quadraticCurveTo(x, y, x + r, y);
+  switch (shapeType) {
+    case 'circle': {
+      const r = Math.max(hw, hh);
+      shape.absarc(0, 0, r, 0, Math.PI * 2, false);
+      return { shape, w: r * 2, h: r * 2 };
+    }
 
-  return shape;
+    case 'oval': {
+      const segments = 48;
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        shape.lineTo(Math.cos(angle) * hw, Math.sin(angle) * hh);
+      }
+      return { shape, w: width, h: height };
+    }
+
+    case 'diamond': {
+      shape.moveTo(0, hh);
+      shape.lineTo(hw, 0);
+      shape.lineTo(0, -hh);
+      shape.lineTo(-hw, 0);
+      shape.closePath();
+      return { shape, w: width, h: height };
+    }
+
+    case 'shield': {
+      const sw = hw;
+      const sh = hh;
+      shape.moveTo(-sw, sh);
+      shape.lineTo(sw, sh);
+      shape.lineTo(sw, -sh * 0.3);
+      shape.quadraticCurveTo(sw, -sh * 0.8, 0, -sh);
+      shape.quadraticCurveTo(-sw, -sh * 0.8, -sw, -sh * 0.3);
+      shape.closePath();
+      return { shape, w: width, h: height };
+    }
+
+    case 'heart': {
+      const s = Math.max(hw, hh);
+      shape.moveTo(0, -s * 0.7);
+      shape.bezierCurveTo(-s * 0.1, -s * 0.95, -s * 0.7, -s * 0.95, -s * 0.9, -s * 0.4);
+      shape.bezierCurveTo(-s * 1.1, s * 0.1, -s * 0.4, s * 0.5, 0, s);
+      shape.bezierCurveTo(s * 0.4, s * 0.5, s * 1.1, s * 0.1, s * 0.9, -s * 0.4);
+      shape.bezierCurveTo(s * 0.7, -s * 0.95, s * 0.1, -s * 0.95, 0, -s * 0.7);
+      return { shape, w: s * 2, h: s * 2 };
+    }
+
+    case 'rectangle':
+    default: {
+      const r = Math.min(radius, hw, hh);
+      const x = -hw;
+      const y = -hh;
+      shape.moveTo(x + r, y);
+      shape.lineTo(x + width - r, y);
+      shape.quadraticCurveTo(x + width, y, x + width, y + r);
+      shape.lineTo(x + width, y + height - r);
+      shape.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      shape.lineTo(x + r, y + height);
+      shape.quadraticCurveTo(x, y + height, x, y + height - r);
+      shape.lineTo(x, y + r);
+      shape.quadraticCurveTo(x, y, x + r, y);
+      return { shape, w: width, h: height };
+    }
+  }
 }
 
 export async function generatePendant(params, materialKey = 'gold', chainInfo = null) {
@@ -50,7 +102,8 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     bevelEnabled,
     platePadding,
     plateRadius,
-    plateThickness
+    plateThickness,
+    pendantShape
   } = params;
 
   if (!text || text.trim().length === 0) return null;
@@ -92,12 +145,16 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   );
 
   const textMesh = new THREE.Mesh(textGeo, material);
-  textMesh.position.z = plateThickness;
+  // Place text flush on the plate surface (plate front face is at z = plateThickness - 0.5)
+  textMesh.position.z = plateThickness - 0.5;
 
-  // Create backing plate
-  const plateW = textWidth + platePadding * 2;
-  const plateH = textHeight + platePadding * 2;
-  const plateShape = createRoundedRectShape(plateW, plateH, plateRadius);
+  // Create backing plate with selected shape
+  const rawW = textWidth + platePadding * 2;
+  const rawH = textHeight + platePadding * 2;
+  const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
+    pendantShape || 'rectangle', rawW, rawH, plateRadius
+  );
+
   const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
     depth: plateThickness,
     bevelEnabled: true,
@@ -116,32 +173,23 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   const pendantTop = plateH / 2;
 
   if (chainInfo) {
-    const { innerTopY, innerBottomY, chainThickness } = chainInfo;
+    const { innerTopY, chainThickness } = chainInfo;
 
-    // --- Bail loop at top of pendant ---
-    const bailRadius = chainThickness * 0.8;
-    const bailTube = chainThickness * 0.25;
-    const bailCenterY = pendantTop + bailRadius;
-    const bailTop = bailCenterY + bailRadius;
+    // Connector bar goes directly from the plate top edge to the chain inner edge.
+    // No bail loop — the connector IS the attachment piece.
+    const connWidth = chainThickness * 0.6;
+    const connDepth = chainThickness * 0.8;
+    const connGap = chainThickness * 0.3;
 
-    const bailGeo = new THREE.TorusGeometry(bailRadius, bailTube, 12, 24);
-    bailGeo.translate(0, bailCenterY, 0);
-    const bailMesh = new THREE.Mesh(bailGeo, material.clone());
-    group.add(bailMesh);
+    // Position pendant so a short connector reaches the chain
+    const pendantCenterY = innerTopY - pendantTop - connGap;
 
-    // --- Position pendant so bail top is near the chain inner edge ---
-    // Short connector bar bridges the small gap from bail to chain.
-    const connGap = chainThickness * 0.5;  // small gap between bail and chain
-    const pendantCenterY = innerTopY - bailTop - connGap;
-
-    // Connector from bail top to chain inner edge
-    const connLocalBottom = bailTop;
+    // Connector from plate top to chain inner edge
+    const connLocalBottom = pendantTop;
     const connLocalTop = innerTopY - pendantCenterY;
     const connHeight = connLocalTop - connLocalBottom;
 
     if (connHeight > 0) {
-      const connWidth = bailTube * 2.5;
-      const connDepth = chainThickness * 0.8;
       const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
       connGeo.translate(0, connLocalBottom + connHeight / 2, 0);
       const connMesh = new THREE.Mesh(connGeo, material.clone());
@@ -156,19 +204,10 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     };
   }
 
-  // Fallback: standalone bail if no chain info
-  const bailRadius = Math.min(plateW * 0.08, 6);
-  const bailTubeRadius = bailRadius * 0.4;
-  const bailGeo = new THREE.TorusGeometry(bailRadius, bailTubeRadius, 8, 16);
-  const bailMesh = new THREE.Mesh(bailGeo, material.clone());
-  bailMesh.position.y = plateH / 2 + bailRadius * 0.6;
-  bailMesh.position.z = plateThickness / 2;
-  group.add(bailMesh);
-
   return {
     group,
     width: plateW,
-    height: plateH + bailRadius * 2,
+    height: plateH,
     pendantCenterY: 0
   };
 }
