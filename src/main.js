@@ -83,10 +83,9 @@ async function rebuildPendant(state) {
 
   pendantGroup = result.group;
 
-  // Position pendant: centered between the chain tips, below them
-  if (result.tipLeft && result.tipRight) {
-    const midX = (result.tipLeft.x + result.tipRight.x) / 2;
-    pendantGroup.position.set(midX, result.pendantCenterY, 0);
+  // Position pendant at the chain tip it connects to
+  if (result.pendantCenterX !== undefined) {
+    pendantGroup.position.set(result.pendantCenterX, result.pendantCenterY, 0);
   }
 
   scene.add(pendantGroup);
