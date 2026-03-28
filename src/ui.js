@@ -45,6 +45,10 @@ export function initUI(onChange) {
   bindSlider('plate-padding', 'platePadding', parseInt);
   bindSlider('plate-radius', 'plateRadius', parseInt);
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
+  bindSlider('pendant-scale', 'pendantScale', parseFloat);
+  bindSlider('pendant-offset-x', 'pendantOffsetX', parseFloat);
+  bindSlider('pendant-offset-y', 'pendantOffsetY', parseFloat);
+  bindSlider('pendant-offset-z', 'pendantOffsetZ', parseFloat);
   bindSlider('chain-scale', 'chainScale', parseFloat);
 
   // Bevel toggle
