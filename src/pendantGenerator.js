@@ -66,12 +66,27 @@ function createPlateShape(shapeType, width, height, radius) {
 
     case 'heart': {
       const s = Math.max(hw, hh);
-      shape.moveTo(0, -s * 0.7);
-      shape.bezierCurveTo(-s * 0.1, -s * 0.95, -s * 0.7, -s * 0.95, -s * 0.9, -s * 0.4);
-      shape.bezierCurveTo(-s * 1.1, s * 0.1, -s * 0.4, s * 0.5, 0, s);
-      shape.bezierCurveTo(s * 0.4, s * 0.5, s * 1.1, s * 0.1, s * 0.9, -s * 0.4);
-      shape.bezierCurveTo(s * 0.7, -s * 0.95, s * 0.1, -s * 0.95, 0, -s * 0.7);
+      // Point at bottom, lobes at top
+      shape.moveTo(0, s * 0.7);
+      shape.bezierCurveTo(-s * 0.1, s * 0.95, -s * 0.7, s * 0.95, -s * 0.9, s * 0.4);
+      shape.bezierCurveTo(-s * 1.1, -s * 0.1, -s * 0.4, -s * 0.5, 0, -s);
+      shape.bezierCurveTo(s * 0.4, -s * 0.5, s * 1.1, -s * 0.1, s * 0.9, s * 0.4);
+      shape.bezierCurveTo(s * 0.7, s * 0.95, s * 0.1, s * 0.95, 0, s * 0.7);
       return { shape, w: s * 2, h: s * 2 };
+    }
+
+    case 'star': {
+      const outerR = Math.max(hw, hh);
+      const innerR = outerR * 0.45;
+      const points = 5;
+      for (let i = 0; i < points * 2; i++) {
+        const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        if (i === 0) shape.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
+        else shape.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+      }
+      shape.closePath();
+      return { shape, w: outerR * 2, h: outerR * 2 };
     }
 
     case 'rectangle':
@@ -177,8 +192,9 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
 
     // Connector bar goes directly from the plate top edge to the chain inner edge.
     // No bail loop — the connector IS the attachment piece.
+    // Match the plate thickness so it sits flush.
     const connWidth = chainThickness * 0.6;
-    const connDepth = chainThickness * 0.8;
+    const connDepth = plateThickness + 1;
     const connGap = chainThickness * 0.3;
 
     // Position pendant so a short connector reaches the chain
@@ -190,8 +206,11 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     const connHeight = connLocalTop - connLocalBottom;
 
     if (connHeight > 0) {
+      // Align connector Z with the plate: plate front is at plateThickness-0.5,
+      // plate back is at -0.5. Center the connector depth within the plate range.
+      const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
       const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
-      connGeo.translate(0, connLocalBottom + connHeight / 2, 0);
+      connGeo.translate(0, connLocalBottom + connHeight / 2, plateMidZ);
       const connMesh = new THREE.Mesh(connGeo, material.clone());
       group.add(connMesh);
     }
