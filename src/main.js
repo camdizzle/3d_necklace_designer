@@ -13,23 +13,23 @@ const { scene, camera, controls } = createScene(viewport);
 
 let chainMesh = null;
 let chainSize = null;
+let chainInfo = null;
 let pendantGroup = null;
 
 async function init() {
   try {
-    // Load chain
     const chain = await loadChain(DEFAULTS.material);
     chainMesh = chain.mesh;
     chainSize = chain.size;
+    chainInfo = {
+      tipLeft: chain.tipLeft,
+      tipRight: chain.tipRight,
+      chainThickness: chain.chainThickness
+    };
     scene.add(chainMesh);
 
-    // Generate initial pendant
     await rebuildPendant(DEFAULTS);
-
-    // Frame the scene
     frameCamera();
-
-    // Hide loading
     loading.classList.add('hidden');
   } catch (err) {
     console.error('Failed to load:', err);
@@ -39,16 +39,15 @@ async function init() {
 
 function frameCamera() {
   const scale = chainMesh.scale.x;
-  const viewHeight = Math.max(chainSize.x, chainSize.y) * scale * 1.3;
+  const viewHeight = Math.max(chainSize.x, chainSize.y) * scale * 1.5;
   const fov = camera.fov * (Math.PI / 180);
   const distance = viewHeight / (2 * Math.tan(fov / 2));
   camera.position.set(0, 0, distance);
-  controls.target.set(0, 0, 0);
+  controls.target.set(0, -20, 0);
   controls.update();
 }
 
 async function rebuildPendant(state) {
-  // Remove existing pendant
   if (pendantGroup) {
     scene.remove(pendantGroup);
     pendantGroup.traverse((child) => {
@@ -60,6 +59,14 @@ async function rebuildPendant(state) {
     pendantGroup = null;
   }
 
+  // Scale chain info tips by current chain scale
+  const scale = state.chainScale;
+  const scaledChainInfo = chainInfo ? {
+    tipLeft: chainInfo.tipLeft.clone().multiplyScalar(scale),
+    tipRight: chainInfo.tipRight.clone().multiplyScalar(scale),
+    chainThickness: chainInfo.chainThickness * scale
+  } : null;
+
   const result = await generatePendant({
     text: state.text,
     font: state.font,
@@ -69,17 +76,19 @@ async function rebuildPendant(state) {
     platePadding: state.platePadding,
     plateRadius: state.plateRadius,
     plateThickness: state.plateThickness
-  }, state.material);
+  }, state.material, scaledChainInfo);
 
   if (!result) return;
 
   pendantGroup = result.group;
 
-  // Position pendant at bottom center of chain
-  // Chain is centered at origin; pendant hangs below
-  const chainHalfHeight = (chainSize.y / 2) * chainMesh.scale.y;
-  pendantGroup.position.y = -chainHalfHeight - result.bailTop + 2;
-  pendantGroup.position.z = 0;
+  // Position pendant: centered horizontally, below the chain tips
+  if (result.tipLeft && result.tipRight) {
+    const midX = (result.tipLeft.x + result.tipRight.x) / 2;
+    pendantGroup.position.x = midX;
+    pendantGroup.position.y = result.pendantCenterY;
+    pendantGroup.position.z = 0;
+  }
 
   scene.add(pendantGroup);
 }
@@ -88,17 +97,11 @@ async function rebuildPendant(state) {
 const state = initUI(async (newState, changedKey) => {
   if (changedKey === 'chainScale') {
     chainMesh.scale.setScalar(newState.chainScale);
-    // Reposition pendant
-    const chainHalfHeight = (chainSize.y / 2) * newState.chainScale;
-    if (pendantGroup) {
-      // Rebuild to reposition
-      await rebuildPendant(newState);
-    }
+    await rebuildPendant(newState);
   } else if (changedKey === 'material') {
     updateChainMaterial(chainMesh, newState.material);
     updatePendantMaterial(pendantGroup, newState.material);
   } else {
-    // Text, font, size, depth, bevel, plate changes — rebuild pendant
     await rebuildPendant(newState);
   }
 });
@@ -109,5 +112,4 @@ exportBtn.addEventListener('click', () => {
   exportSTL(scene, `${text.toLowerCase()}_necklace.stl`);
 });
 
-// Go
 init();
