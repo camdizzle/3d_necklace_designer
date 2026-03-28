@@ -6,38 +6,48 @@ function findChainTips(geometry) {
   const pos = geometry.attributes.position;
   const count = pos.count;
 
-  // Find bounding box to identify the axis with the opening
-  let yMin = Infinity, yMax = -Infinity;
+  // Find bounding box
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
   for (let i = 0; i < count; i++) {
+    const x = pos.getX(i);
     const y = pos.getY(i);
+    if (x < xMin) xMin = x;
+    if (x > xMax) xMax = x;
     if (y < yMin) yMin = y;
     if (y > yMax) yMax = y;
   }
 
-  // The chain opens along Y — tips are at the Y extremes
-  // Collect vertices near each Y extreme (within 5 units)
-  const threshold = 5;
-  const tip1Verts = [];
-  const tip2Verts = [];
+  // The STL is already in necklace orientation: arc at top (+Y), two open tips at bottom (-Y).
+  // The left tip is at negative X (bottom-left), the right tip at positive X (bottom-right).
+  // Collect vertices near the bottom (lowest Y) on each side of center (X=0).
+  const yThreshold = yMin + (yMax - yMin) * 0.15; // bottom 15%
+  const leftTipVerts = [];
+  const rightTipVerts = [];
 
   for (let i = 0; i < count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
-    if (y < yMin + threshold) tip1Verts.push(new THREE.Vector3(x, y, z));
-    if (y > yMax - threshold) tip2Verts.push(new THREE.Vector3(x, y, z));
+    if (y < yThreshold) {
+      if (x < 0) {
+        leftTipVerts.push(new THREE.Vector3(x, y, z));
+      } else {
+        rightTipVerts.push(new THREE.Vector3(x, y, z));
+      }
+    }
   }
 
-  // Compute centroid of each tip cluster
-  const tip1 = new THREE.Vector3();
-  tip1Verts.forEach(v => tip1.add(v));
-  tip1.divideScalar(tip1Verts.length);
+  function centroid(verts) {
+    const c = new THREE.Vector3();
+    verts.forEach(v => c.add(v));
+    c.divideScalar(verts.length);
+    return c;
+  }
 
-  const tip2 = new THREE.Vector3();
-  tip2Verts.forEach(v => tip2.add(v));
-  tip2.divideScalar(tip2Verts.length);
+  const tipLeft = leftTipVerts.length > 0 ? centroid(leftTipVerts) : new THREE.Vector3(xMin, yMin, 0);
+  const tipRight = rightTipVerts.length > 0 ? centroid(rightTipVerts) : new THREE.Vector3(xMax, yMin, 0);
 
-  return { tip1, tip2 };
+  return { tipLeft, tipRight };
 }
 
 export function loadChain(materialKey = 'gold') {
@@ -50,7 +60,7 @@ export function loadChain(materialKey = 'gold') {
         geometry.computeVertexNormals();
         geometry.center();
 
-        // Find tip positions before rotation (in centered coords)
+        // Find tip positions (in centered coords)
         const tips = findChainTips(geometry);
 
         const mat = MATERIALS[materialKey];
@@ -62,29 +72,18 @@ export function loadChain(materialKey = 'gold') {
         });
 
         const mesh = new THREE.Mesh(geometry, material);
+        // No rotation needed — the STL is already in necklace orientation
 
-        // Rotate -90° around Z so the chain hangs like a necklace:
-        // - Tips (Y extremes) move to X extremes (left/right at bottom)
-        // - Chain body (negative X) moves to top (over the neck)
-        mesh.rotation.z = -Math.PI / 2;
-
-        // Compute rotated tip positions (x' = y, y' = -x for -90° Z rotation)
-        const tip1Rotated = new THREE.Vector3(tips.tip1.y, -tips.tip1.x, tips.tip1.z);
-        const tip2Rotated = new THREE.Vector3(tips.tip2.y, -tips.tip2.x, tips.tip2.z);
-
-        // Compute size after rotation
         const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
-        const rawSize = box.getSize(new THREE.Vector3());
-        // After 90° rotation, X and Y swap
-        const size = new THREE.Vector3(rawSize.y, rawSize.x, rawSize.z);
+        const size = box.getSize(new THREE.Vector3());
 
         resolve({
           mesh,
           geometry,
           size,
-          tipLeft: tip1Rotated,   // left tip (negative X)
-          tipRight: tip2Rotated,  // right tip (positive X)
-          chainThickness: rawSize.z
+          tipLeft: tips.tipLeft,
+          tipRight: tips.tipRight,
+          chainThickness: size.z
         });
       },
       undefined,

@@ -39,11 +39,12 @@ async function init() {
 
 function frameCamera() {
   const scale = chainMesh.scale.x;
-  const viewHeight = Math.max(chainSize.x, chainSize.y) * scale * 1.5;
+  const viewHeight = Math.max(chainSize.x, chainSize.y) * scale * 1.6;
   const fov = camera.fov * (Math.PI / 180);
   const distance = viewHeight / (2 * Math.tan(fov / 2));
   camera.position.set(0, 0, distance);
-  controls.target.set(0, -20, 0);
+  // Center camera slightly above middle since pendant hangs below chain
+  controls.target.set(0, -chainSize.y * scale * 0.15, 0);
   controls.update();
 }
 
@@ -82,12 +83,10 @@ async function rebuildPendant(state) {
 
   pendantGroup = result.group;
 
-  // Position pendant: centered horizontally, below the chain tips
+  // Position pendant: centered between the chain tips, below them
   if (result.tipLeft && result.tipRight) {
     const midX = (result.tipLeft.x + result.tipRight.x) / 2;
-    pendantGroup.position.x = midX;
-    pendantGroup.position.y = result.pendantCenterY;
-    pendantGroup.position.z = 0;
+    pendantGroup.position.set(midX, result.pendantCenterY, 0);
   }
 
   scene.add(pendantGroup);

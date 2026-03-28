@@ -41,22 +41,16 @@ function createRoundedRectShape(width, height, radius) {
   return shape;
 }
 
-function createConnectorBar(start, end, width, depth) {
-  const dir = new THREE.Vector3().subVectors(end, start);
-  const length = dir.length();
-  const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-
-  // Create a box for the connector
-  const barGeo = new THREE.BoxGeometry(width, length, depth);
-
-  // Rotate to align with the direction
-  const angle = Math.atan2(dir.x, dir.y);
-  barGeo.rotateZ(-angle);
-
-  // Position at midpoint
-  barGeo.translate(midpoint.x, midpoint.y, midpoint.z);
-
-  return barGeo;
+function createChainLink(center, radius, tubeRadius, rotationAxis, rotationAngle) {
+  // Create a torus (chain link) at the given position
+  const geo = new THREE.TorusGeometry(radius, tubeRadius, 8, 24);
+  if (rotationAxis && rotationAngle !== undefined) {
+    geo.rotateX(rotationAxis === 'x' ? rotationAngle : 0);
+    geo.rotateY(rotationAxis === 'y' ? rotationAngle : 0);
+    geo.rotateZ(rotationAxis === 'z' ? rotationAngle : 0);
+  }
+  geo.translate(center.x, center.y, center.z);
+  return geo;
 }
 
 export async function generatePendant(params, materialKey = 'gold', chainInfo = null) {
@@ -133,33 +127,73 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
 
   // Determine pendant dimensions for positioning
   const pendantTop = plateH / 2;
-  const pendantAttachLeft = new THREE.Vector3(-plateW / 2, pendantTop, extrudeDepth / 2);
-  const pendantAttachRight = new THREE.Vector3(plateW / 2, pendantTop, extrudeDepth / 2);
 
-  // If chain info provided, create connector bars from chain tips to pendant
   if (chainInfo) {
     const { tipLeft, tipRight, chainThickness } = chainInfo;
-    const barWidth = Math.max(chainThickness, 6);
-    const barDepth = chainThickness;
 
-    // Connectors go from chain tips down to pendant top corners
-    // These positions are in world space — we need them relative to the group
-    // The group will be positioned so the pendant center is between the tips
-    const pendantCenterY = (tipLeft.y + tipRight.y) / 2 - pendantTop - barWidth * 1.5;
+    // The chain tips are in world space. Position the pendant so its top
+    // is directly below the midpoint of the two tips, with a small gap.
+    const midX = (tipLeft.x + tipRight.x) / 2;
+    const tipY = Math.min(tipLeft.y, tipRight.y);
 
-    // Left connector: from tipLeft to pendant top-left
-    const leftStart = new THREE.Vector3(tipLeft.x, tipLeft.y - pendantCenterY, tipLeft.z);
-    const leftEnd = new THREE.Vector3(-plateW / 2, pendantTop, tipLeft.z);
-    const leftBarGeo = createConnectorBar(leftStart, leftEnd, barWidth, barDepth);
-    const leftBar = new THREE.Mesh(leftBarGeo, material.clone());
-    group.add(leftBar);
+    // Chain link dimensions based on chain thickness
+    const linkRadius = Math.max(chainThickness * 1.2, 5);
+    const linkTube = Math.max(chainThickness * 0.3, 1.5);
 
-    // Right connector: from tipRight to pendant top-right
-    const rightStart = new THREE.Vector3(tipRight.x, tipRight.y - pendantCenterY, tipRight.z);
-    const rightEnd = new THREE.Vector3(plateW / 2, pendantTop, tipRight.z);
-    const rightBarGeo = createConnectorBar(rightStart, rightEnd, barWidth, barDepth);
-    const rightBar = new THREE.Mesh(rightBarGeo, material.clone());
-    group.add(rightBar);
+    // Position pendant center so its top edge is just below the tips
+    // with room for one connecting link
+    const pendantCenterY = tipY - linkRadius * 2 - pendantTop;
+
+    // Create a bail (horizontal torus) at the top of the pendant
+    const bailRadius = Math.min(plateW * 0.12, linkRadius * 1.2);
+    const bailTube = linkTube;
+    const bailY = pendantTop + bailRadius * 0.3;
+    const bailGeo = new THREE.TorusGeometry(bailRadius, bailTube, 8, 24);
+    bailGeo.translate(0, bailY, chainThickness / 2);
+    const bailMesh = new THREE.Mesh(bailGeo, material.clone());
+    group.add(bailMesh);
+
+    // Create chain link connectors from each tip to the bail
+    // These are small torus links that interlock, like real chain links
+    // Left connecting link — vertical torus at the left tip position, relative to pendant group
+    const leftLinkX = tipLeft.x - midX;
+    const leftLinkY = tipLeft.y - pendantCenterY;
+    const leftLinkGeo = createChainLink(
+      new THREE.Vector3(leftLinkX, leftLinkY, chainThickness / 2),
+      linkRadius, linkTube, 'y', Math.PI / 2
+    );
+    const leftLink = new THREE.Mesh(leftLinkGeo, material.clone());
+    group.add(leftLink);
+
+    // Intermediate link between left tip link and bail — rotated 90° to interlock
+    const leftMidY = (leftLinkY + bailY) / 2;
+    const leftMidX = leftLinkX / 2;
+    const leftMidGeo = createChainLink(
+      new THREE.Vector3(leftMidX, leftMidY, chainThickness / 2),
+      linkRadius, linkTube, 'x', Math.PI / 2
+    );
+    const leftMid = new THREE.Mesh(leftMidGeo, material.clone());
+    group.add(leftMid);
+
+    // Right connecting link
+    const rightLinkX = tipRight.x - midX;
+    const rightLinkY = tipRight.y - pendantCenterY;
+    const rightLinkGeo = createChainLink(
+      new THREE.Vector3(rightLinkX, rightLinkY, chainThickness / 2),
+      linkRadius, linkTube, 'y', Math.PI / 2
+    );
+    const rightLink = new THREE.Mesh(rightLinkGeo, material.clone());
+    group.add(rightLink);
+
+    // Intermediate link between right tip link and bail
+    const rightMidY = (rightLinkY + bailY) / 2;
+    const rightMidX = rightLinkX / 2;
+    const rightMidGeo = createChainLink(
+      new THREE.Vector3(rightMidX, rightMidY, chainThickness / 2),
+      linkRadius, linkTube, 'x', Math.PI / 2
+    );
+    const rightMid = new THREE.Mesh(rightMidGeo, material.clone());
+    group.add(rightMid);
 
     return {
       group,
