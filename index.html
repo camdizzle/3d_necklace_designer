@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Necklace Designer</title>
+  <style>
+    :root {
+      --panel-width: 300px;
+      --bg-dark: #1a1a2e;
+      --bg-panel: #16213e;
+      --bg-input: #0f3460;
+      --accent: #e94560;
+      --gold: #FFD700;
+      --text: #eee;
+      --text-dim: #999;
+      --border: #2a2a4a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Settings Panel */
+    #panel {
+      width: var(--panel-width);
+      min-width: var(--panel-width);
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #panel-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+
+    #panel-header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    #panel-header p {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+
+    .section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    .control-group {
+      margin-bottom: 14px;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    .control-group input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .control-group input[type="text"]:focus {
+      border-color: var(--gold);
+    }
+
+    .control-group select {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--bg-input);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--gold);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .slider-value {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gold);
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--gold);
+      cursor: pointer;
+    }
+
+    .checkbox-row label {
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+
+    /* Color Presets */
+    .color-presets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .color-btn {
+      padding: 8px;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .color-btn.active {
+      border-color: white;
+    }
+
+    .color-btn.gold { background: linear-gradient(135deg, #FFD700, #B8860B); color: #1a1a2e; }
+    .color-btn.silver { background: linear-gradient(135deg, #C0C0C0, #808080); color: #1a1a2e; }
+    .color-btn.rose { background: linear-gradient(135deg, #E8A090, #B76E79); color: #1a1a2e; }
+    .color-btn.platinum { background: linear-gradient(135deg, #E5E4E2, #A9A9A9); color: #1a1a2e; }
+
+    /* Export Button */
+    #export-btn {
+      margin: 20px;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--gold), #B8860B);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    #export-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
+    }
+
+    #export-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Viewport */
+    #viewport {
+      flex: 1;
+      position: relative;
+      background: var(--bg-dark);
+    }
+
+    #viewport canvas {
+      display: block;
+    }
+
+    /* Loading Overlay */
+    #loading {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.5s;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loading p {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    /* Viewport hint */
+    #viewport-hint {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: var(--text-dim);
+      pointer-events: none;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="panel">
+      <div id="panel-header">
+        <h1>Chain Studio</h1>
+        <p>3D Necklace Designer</p>
+      </div>
+
+      <!-- Pendant Text -->
+      <div class="section">
+        <div class="section-title">Pendant Text</div>
+        <div class="control-group">
+          <label for="text-input">Text</label>
+          <input type="text" id="text-input" value="KING" maxlength="12" spellcheck="false">
+        </div>
+        <div class="control-group">
+          <label for="font-select">Font</label>
+          <select id="font-select">
+            <option value="helvetiker_bold">Helvetiker Bold</option>
+            <option value="optimer_bold">Optimer Bold</option>
+            <option value="gentilis_bold">Gentilis Bold</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Pendant Size -->
+      <div class="section">
+        <div class="section-title">Pendant Size</div>
+        <div class="control-group">
+          <label>Text Size</label>
+          <div class="slider-row">
+            <input type="range" id="text-size" min="8" max="50" value="24" step="1">
+            <span class="slider-value" id="text-size-val">24</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Extrude Depth</label>
+          <div class="slider-row">
+            <input type="range" id="extrude-depth" min="2" max="20" value="8" step="1">
+            <span class="slider-value" id="extrude-depth-val">8</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="bevel-toggle" checked>
+            <label for="bevel-toggle">Bevel Edges</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pendant Plate -->
+      <div class="section">
+        <div class="section-title">Backing Plate</div>
+        <div class="control-group">
+          <label>Padding</label>
+          <div class="slider-row">
+            <input type="range" id="plate-padding" min="2" max="20" value="8" step="1">
+            <span class="slider-value" id="plate-padding-val">8</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Corner Radius</label>
+          <div class="slider-row">
+            <input type="range" id="plate-radius" min="0" max="15" value="5" step="1">
+            <span class="slider-value" id="plate-radius-val">5</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Plate Thickness</label>
+          <div class="slider-row">
+            <input type="range" id="plate-thickness" min="1" max="10" value="3" step="0.5">
+            <span class="slider-value" id="plate-thickness-val">3</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chain Settings -->
+      <div class="section">
+        <div class="section-title">Chain</div>
+        <div class="control-group">
+          <label>Scale</label>
+          <div class="slider-row">
+            <input type="range" id="chain-scale" min="0.3" max="2.0" value="1.0" step="0.05">
+            <span class="slider-value" id="chain-scale-val">1.0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Material -->
+      <div class="section">
+        <div class="section-title">Material</div>
+        <div class="control-presets">
+          <div class="color-presets">
+            <button class="color-btn gold active" data-color="gold">Gold</button>
+            <button class="color-btn silver" data-color="silver">Silver</button>
+            <button class="color-btn rose" data-color="rose">Rose Gold</button>
+            <button class="color-btn platinum" data-color="platinum">Platinum</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="export-btn">Export STL</button>
+    </div>
+
+    <div id="viewport">
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading chain model...</p>
+      </div>
+      <div id="viewport-hint">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
