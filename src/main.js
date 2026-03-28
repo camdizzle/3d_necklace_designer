@@ -74,7 +74,8 @@ async function rebuildPendant(state) {
     bevelEnabled: state.bevelEnabled,
     platePadding: state.platePadding,
     plateRadius: state.plateRadius,
-    plateThickness: state.plateThickness
+    plateThickness: state.plateThickness,
+    pendantShape: state.pendantShape
   }, state.material, scaledChainInfo);
 
   if (!result) return;

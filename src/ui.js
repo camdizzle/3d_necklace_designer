@@ -21,6 +21,13 @@ export function initUI(onChange) {
     onChange(state, 'font');
   });
 
+  // Shape select
+  const shapeSelect = document.getElementById('shape-select');
+  shapeSelect.addEventListener('change', () => {
+    state.pendantShape = shapeSelect.value;
+    onChange(state, 'pendantShape');
+  });
+
   // Slider helper
   function bindSlider(id, key, transform = parseFloat) {
     const slider = document.getElementById(id);
