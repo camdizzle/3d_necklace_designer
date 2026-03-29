@@ -47,7 +47,7 @@ export const DEFAULTS = {
   pendantScale: 1.0,
   pendantOffsetX: 0,
   pendantOffsetY: 0,
-  pendantOffsetZ: 0,
+  pendantOffsetZ: -2.5,
   chainScale: 1.0,
   material: 'gold',
 
