@@ -292,13 +292,17 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       ? createCharacterMeshes(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
       : createSingleTextMesh(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, material.clone());
 
-    // Position second line below first
+    // Position second line below first, then vertically center the combined block
     const gap = textSize * 0.3;
+    const secondBlockHeight = gap + sl.height;
     sl.group.position.y = -(totalTextHeight / 2 + gap + sl.height / 2);
     textGroup.add(sl.group);
 
     totalTextWidth = Math.max(totalTextWidth, sl.width);
-    totalTextHeight += gap + sl.height;
+    totalTextHeight += secondBlockHeight;
+
+    // Shift entire text group up so the combined block is vertically centered
+    textGroup.position.y = secondBlockHeight / 2;
     secondLineResult = sl;
   }
 
