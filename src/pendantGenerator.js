@@ -190,62 +190,27 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   if (chainInfo) {
     const { innerTopY, chainThickness } = chainInfo;
 
-    // Print-in-place interlocking loops connector.
-    // Two torus rings interlock with clearance so they can pivot after printing.
-    const clearance = 0.3; // mm gap for print-in-place separation
-    const loopRadius = chainThickness * 0.35; // major radius of each ring
-    const tubeRadius = chainThickness * 0.12; // tube thickness of each ring
-    const loopSpacing = clearance; // gap between pendant and chain attachment
-
-    // Position pendant so loops fit between plate top and chain inner edge
-    const totalConnHeight = loopRadius * 2 + loopSpacing;
-    const pendantCenterY = innerTopY - pendantTop - totalConnHeight;
+    // Clean connector bar from plate top to chain inner edge.
+    // Offset above bevel to prevent plate artifact.
+    const bevelClear = 1.0; // clear the plate bevel
+    const connGap = chainThickness * 0.3;
+    const pendantCenterY = innerTopY - pendantTop - connGap;
 
     // Plate Z range: back at -0.5, front at plateThickness-0.5
     const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
 
-    // Bottom loop: attached to pendant plate top, sits above bevel
-    const bevelClear = 1.0; // clear the plate bevel
-    const bottomLoopY = pendantTop + bevelClear + loopRadius;
-    // Torus lies in XY plane by default; we want it in XZ plane so it hangs like a ring
-    const bottomLoopGeo = new THREE.TorusGeometry(loopRadius, tubeRadius, 12, 24);
-    bottomLoopGeo.rotateX(Math.PI / 2); // rotate to hang vertically in XZ
-    bottomLoopGeo.translate(0, bottomLoopY, plateMidZ);
-    const bottomLoopMesh = new THREE.Mesh(bottomLoopGeo, material.clone());
-    group.add(bottomLoopMesh);
+    // Connector from above plate bevel to chain inner edge
+    const connLocalBottom = pendantTop + bevelClear;
+    const connLocalTop = innerTopY - pendantCenterY;
+    const connHeight = connLocalTop - connLocalBottom;
 
-    // Small vertical tab connecting plate top to the bottom loop
-    const tabHeight = bevelClear + loopRadius - tubeRadius;
-    if (tabHeight > 0) {
-      const tabWidth = tubeRadius * 2.5;
-      const tabDepth = tubeRadius * 2.5;
-      const tabGeo = new THREE.BoxGeometry(tabWidth, tabHeight, tabDepth);
-      tabGeo.translate(0, pendantTop + tabHeight / 2, plateMidZ);
-      const tabMesh = new THREE.Mesh(tabGeo, material.clone());
-      group.add(tabMesh);
-    }
-
-    // Top loop: interlocks with bottom loop, connects up to chain
-    // Offset in Z so it passes through the bottom loop
-    const topLoopY = bottomLoopY + loopRadius + clearance + loopRadius;
-    const topLoopGeo = new THREE.TorusGeometry(loopRadius, tubeRadius, 12, 24);
-    // This loop hangs in YZ plane (perpendicular to the bottom loop) so they interlock
-    topLoopGeo.rotateY(Math.PI / 2);
-    topLoopGeo.translate(0, topLoopY, plateMidZ);
-    const topLoopMesh = new THREE.Mesh(topLoopGeo, material.clone());
-    group.add(topLoopMesh);
-
-    // Small vertical tab from top loop up toward chain inner edge
-    const topTabBottom = topLoopY + loopRadius - tubeRadius;
-    const topTabTop = innerTopY - pendantCenterY;
-    const topTabHeight = topTabTop - topTabBottom;
-    if (topTabHeight > 0) {
-      const topTabWidth = tubeRadius * 2.5;
-      const topTabDepth = tubeRadius * 2.5;
-      const topTabGeo = new THREE.BoxGeometry(topTabWidth, topTabHeight, topTabDepth);
-      topTabGeo.translate(0, topTabBottom + topTabHeight / 2, plateMidZ);
-      const topTabMesh = new THREE.Mesh(topTabGeo, material.clone());
-      group.add(topTabMesh);
+    if (connHeight > 0) {
+      const connWidth = chainThickness * 0.5;
+      const connDepth = plateThickness + 1;
+      const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
+      connGeo.translate(0, connLocalBottom + connHeight / 2, plateMidZ);
+      const connMesh = new THREE.Mesh(connGeo, material.clone());
+      group.add(connMesh);
     }
 
     // Compute default Z to align plate center with chain center (Z=0)
