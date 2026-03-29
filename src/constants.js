@@ -49,5 +49,32 @@ export const DEFAULTS = {
   pendantOffsetY: 0,
   pendantOffsetZ: 0,
   chainScale: 1.0,
-  material: 'gold'
+  material: 'gold',
+
+  // Text features
+  letterSpacing: 0,
+  textAlignment: 'center',
+  textCurve: 0,
+  secondLineText: '',
+  secondLineSize: 16,
+
+  // Visual features
+  customColor: '#FFD700',
+  useCustomColor: false,
+  chainMaterial: 'gold',
+  twoTone: false,
+  matteFinish: false,
+  backgroundColor: '#1a1a2e',
+
+  // Plate features
+  engrave: false,
+  borderWidth: 0,
+  customShapePoints: null,
+
+  // Chain
+  hideChain: false,
+
+  // Export
+  exportFormat: 'stl',
+  showDimensions: true
 };

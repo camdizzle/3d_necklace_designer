@@ -22,7 +22,7 @@ function loadFont(fontKey) {
   });
 }
 
-function createPlateShape(shapeType, width, height, radius) {
+function createPlateShape(shapeType, width, height, radius, customShapePoints) {
   const shape = new THREE.Shape();
   const hw = width / 2;
   const hh = height / 2;
@@ -66,7 +66,6 @@ function createPlateShape(shapeType, width, height, radius) {
 
     case 'heart': {
       const s = Math.max(hw, hh);
-      // Point at bottom, lobes at top
       shape.moveTo(0, s * 0.7);
       shape.bezierCurveTo(-s * 0.1, s * 0.95, -s * 0.7, s * 0.95, -s * 0.9, s * 0.4);
       shape.bezierCurveTo(-s * 1.1, -s * 0.1, -s * 0.4, -s * 0.5, 0, -s);
@@ -89,6 +88,21 @@ function createPlateShape(shapeType, width, height, radius) {
       return { shape, w: outerR * 2, h: outerR * 2 };
     }
 
+    case 'custom': {
+      if (customShapePoints && customShapePoints.length > 2) {
+        // Custom SVG-derived shape points, already normalized to [-0.5, 0.5]
+        const first = customShapePoints[0];
+        shape.moveTo(first[0] * width, first[1] * height);
+        for (let i = 1; i < customShapePoints.length; i++) {
+          shape.lineTo(customShapePoints[i][0] * width, customShapePoints[i][1] * height);
+        }
+        shape.closePath();
+        return { shape, w: width, h: height };
+      }
+      // Fallback to rectangle
+      return createPlateShape('rectangle', width, height, radius);
+    }
+
     case 'rectangle':
     default: {
       const r = Math.min(radius, hw, hh);
@@ -108,7 +122,131 @@ function createPlateShape(shapeType, width, height, radius) {
   }
 }
 
-export async function generatePendant(params, materialKey = 'gold', chainInfo = null) {
+/**
+ * Create text as individual character meshes for letter spacing and curve support.
+ */
+function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material) {
+  const group = new THREE.Group();
+  const chars = [];
+  let totalWidth = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === ' ') {
+      const spaceWidth = textSize * 0.3;
+      chars.push({ width: spaceWidth, mesh: null });
+      totalWidth += spaceWidth + letterSpacing;
+      continue;
+    }
+
+    const geo = new TextGeometry(char, {
+      font,
+      size: textSize,
+      depth: extrudeDepth,
+      curveSegments: 6,
+      bevelEnabled,
+      bevelThickness: bevelEnabled ? 1.5 : 0,
+      bevelSize: bevelEnabled ? 1 : 0,
+      bevelSegments: bevelEnabled ? 3 : 0
+    });
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    const w = bb.max.x - bb.min.x;
+    const h = bb.max.y - bb.min.y;
+    // Center character at its own origin
+    geo.translate(-(bb.min.x + w / 2), -(bb.min.y + h / 2), 0);
+
+    const mesh = new THREE.Mesh(geo, material.clone());
+    chars.push({ width: w, height: h, mesh });
+    totalWidth += w + letterSpacing;
+  }
+  totalWidth -= letterSpacing; // remove trailing spacing
+
+  // Position characters along line or arc
+  let cursor = -totalWidth / 2;
+  for (const ch of chars) {
+    if (!ch.mesh) {
+      cursor += ch.width + letterSpacing;
+      continue;
+    }
+
+    const cx = cursor + ch.width / 2;
+
+    if (textCurve !== 0) {
+      const radius = 300 / Math.abs(textCurve);
+      const angle = cx / radius;
+      const x = Math.sin(angle) * radius;
+      const y = textCurve > 0
+        ? (Math.cos(angle) * radius - radius)
+        : -(Math.cos(angle) * radius - radius);
+      ch.mesh.position.set(x, y, 0);
+      ch.mesh.rotation.z = -angle * Math.sign(textCurve);
+    } else {
+      ch.mesh.position.set(cx, 0, 0);
+    }
+
+    group.add(ch.mesh);
+    cursor += ch.width + letterSpacing;
+  }
+
+  // Compute bounds
+  if (group.children.length > 0) {
+    const box = new THREE.Box3().setFromObject(group);
+    const size = box.getSize(new THREE.Vector3());
+    return { group, width: size.x, height: size.y };
+  }
+  return { group, width: 0, height: 0 };
+}
+
+/**
+ * Create a single text mesh (no letter spacing / curve).
+ */
+function createSingleTextMesh(text, font, textSize, extrudeDepth, bevelEnabled, material) {
+  const geo = new TextGeometry(text, {
+    font,
+    size: textSize,
+    depth: extrudeDepth,
+    curveSegments: 6,
+    bevelEnabled,
+    bevelThickness: bevelEnabled ? 1.5 : 0,
+    bevelSize: bevelEnabled ? 1 : 0,
+    bevelSegments: bevelEnabled ? 3 : 0
+  });
+
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const w = bb.max.x - bb.min.x;
+  const h = bb.max.y - bb.min.y;
+  geo.translate(-(bb.min.x + w / 2), -(bb.min.y + h / 2), 0);
+
+  const mesh = new THREE.Mesh(geo, material);
+  const group = new THREE.Group();
+  group.add(mesh);
+  return { group, width: w, height: h };
+}
+
+export function createMaterial(materialKey, opts = {}) {
+  const { customColor, useCustomColor, matteFinish } = opts;
+
+  if (useCustomColor && customColor) {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(customColor),
+      metalness: 0.9,
+      roughness: matteFinish ? 0.7 : 0.25,
+      envMapIntensity: 1.0
+    });
+  }
+
+  const mat = MATERIALS[materialKey] || MATERIALS.gold;
+  return new THREE.MeshStandardMaterial({
+    color: mat.color,
+    metalness: mat.metalness,
+    roughness: matteFinish ? Math.min(mat.roughness + 0.45, 1.0) : mat.roughness,
+    envMapIntensity: mat.envMapIntensity
+  });
+}
+
+export async function generatePendant(params, materialOpts = {}, chainInfo = null) {
   const {
     text,
     font: fontKey,
@@ -118,7 +256,15 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
     platePadding,
     plateRadius,
     plateThickness,
-    pendantShape
+    pendantShape,
+    letterSpacing = 0,
+    textAlignment = 'center',
+    textCurve = 0,
+    secondLineText = '',
+    secondLineSize = 16,
+    engrave = false,
+    borderWidth = 0,
+    customShapePoints = null
   } = params;
 
   if (!text || text.trim().length === 0) return null;
@@ -127,48 +273,68 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   const group = new THREE.Group();
   group.name = 'pendant';
 
-  const mat = MATERIALS[materialKey];
-  const material = new THREE.MeshStandardMaterial({
-    color: mat.color,
-    metalness: mat.metalness,
-    roughness: mat.roughness,
-    envMapIntensity: mat.envMapIntensity
-  });
+  const material = createMaterial(materialOpts.key || 'gold', materialOpts);
 
-  // Create text geometry
-  const textGeo = new TextGeometry(text.toUpperCase(), {
-    font: font,
-    size: textSize,
-    depth: extrudeDepth,
-    curveSegments: 6,
-    bevelEnabled: bevelEnabled,
-    bevelThickness: bevelEnabled ? 1.5 : 0,
-    bevelSize: bevelEnabled ? 1 : 0,
-    bevelSegments: bevelEnabled ? 3 : 0
-  });
+  // Create primary text
+  const usePerChar = letterSpacing !== 0 || textCurve !== 0;
+  const textResult = usePerChar
+    ? createCharacterMeshes(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
+    : createSingleTextMesh(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, material.clone());
 
-  textGeo.computeBoundingBox();
-  const textBox = textGeo.boundingBox;
-  const textWidth = textBox.max.x - textBox.min.x;
-  const textHeight = textBox.max.y - textBox.min.y;
+  const textGroup = textResult.group;
+  let totalTextWidth = textResult.width;
+  let totalTextHeight = textResult.height;
 
-  // Center the text geometry
-  textGeo.translate(
-    -(textBox.min.x + textWidth / 2),
-    -(textBox.min.y + textHeight / 2),
-    0
-  );
+  // Create second line if provided
+  let secondLineResult = null;
+  if (secondLineText && secondLineText.trim().length > 0) {
+    const sl = usePerChar
+      ? createCharacterMeshes(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
+      : createSingleTextMesh(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, material.clone());
 
-  const textMesh = new THREE.Mesh(textGeo, material);
-  // Place text flush on the plate surface (plate front face is at z = plateThickness - 0.5)
-  textMesh.position.z = plateThickness - 0.5;
+    // Position second line below first
+    const gap = textSize * 0.3;
+    sl.group.position.y = -(totalTextHeight / 2 + gap + sl.height / 2);
+    textGroup.add(sl.group);
+
+    totalTextWidth = Math.max(totalTextWidth, sl.width);
+    totalTextHeight += gap + sl.height;
+    secondLineResult = sl;
+  }
+
+  // Position text on plate surface
+  const plateFrontZ = plateThickness - 0.5;
+  if (engrave) {
+    // Engrave: push text slightly into plate surface
+    textGroup.position.z = plateFrontZ - extrudeDepth + 0.3;
+    // Darken the engraved text slightly for visual distinction
+    textGroup.traverse((child) => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.material.color.multiplyScalar(0.6);
+      }
+    });
+  } else {
+    textGroup.position.z = plateFrontZ;
+  }
+
+  // Apply text alignment offset (applied after plate is created)
+  let textAlignOffset = 0;
 
   // Create backing plate with selected shape
-  const rawW = textWidth + platePadding * 2;
-  const rawH = textHeight + platePadding * 2;
+  const rawW = totalTextWidth + platePadding * 2;
+  const rawH = totalTextHeight + platePadding * 2;
   const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
-    pendantShape || 'rectangle', rawW, rawH, plateRadius
+    pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
   );
+
+  // Apply text alignment
+  if (textAlignment === 'left') {
+    textAlignOffset = -(plateW / 2 - platePadding - totalTextWidth / 2);
+  } else if (textAlignment === 'right') {
+    textAlignOffset = (plateW / 2 - platePadding - totalTextWidth / 2);
+  }
+  textGroup.position.x = textAlignOffset;
 
   const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
     depth: plateThickness,
@@ -180,10 +346,39 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   plateGeo.translate(0, 0, -0.5);
 
   const plateMesh = new THREE.Mesh(plateGeo, material.clone());
-  plateMesh.material.roughness = mat.roughness + 0.1;
+  plateMesh.material.roughness = (materialOpts.matteFinish ? 0.7 : (MATERIALS[materialOpts.key]?.roughness || 0.25)) + 0.1;
 
   group.add(plateMesh);
-  group.add(textMesh);
+  group.add(textGroup);
+
+  // Border / frame
+  if (borderWidth > 0) {
+    const borderOuter = createPlateShape(
+      pendantShape || 'rectangle',
+      rawW + borderWidth * 2,
+      rawH + borderWidth * 2,
+      plateRadius + borderWidth,
+      customShapePoints
+    );
+
+    // Create the inner hole from the plate shape
+    const holePath = new THREE.Path();
+    const platePoints = plateShape.getPoints(48);
+    holePath.setFromPoints(platePoints);
+    borderOuter.shape.holes.push(holePath);
+
+    const borderGeo = new THREE.ExtrudeGeometry(borderOuter.shape, {
+      depth: plateThickness + 1,
+      bevelEnabled: true,
+      bevelThickness: 0.3,
+      bevelSize: 0.3,
+      bevelSegments: 1
+    });
+    borderGeo.translate(0, 0, -0.5);
+
+    const borderMesh = new THREE.Mesh(borderGeo, material.clone());
+    group.add(borderMesh);
+  }
 
   const pendantTop = plateH / 2;
 
@@ -192,7 +387,7 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
 
     // Clean connector bar from plate top to chain inner edge.
     // Offset above bevel to prevent plate artifact.
-    const bevelClear = 1.0; // clear the plate bevel
+    const bevelClear = 1.0;
     const connGap = chainThickness * 0.3;
     const pendantCenterY = innerTopY - pendantTop - connGap;
 
@@ -213,7 +408,6 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
       group.add(connMesh);
     }
 
-    // Compute default Z to align plate center with chain center (Z=0)
     const defaultZ = -plateMidZ;
 
     return {
@@ -234,12 +428,12 @@ export async function generatePendant(params, materialKey = 'gold', chainInfo = 
   };
 }
 
-export function updatePendantMaterial(group, materialKey) {
+export function updateMaterialOnGroup(group, materialOpts) {
   if (!group) return;
-  const mat = MATERIALS[materialKey];
+  const mat = createMaterial(materialOpts.key || 'gold', materialOpts);
   group.traverse((child) => {
     if (child.isMesh) {
-      child.material.color.setHex(mat.color);
+      child.material.color.copy(mat.color);
       child.material.metalness = mat.metalness;
       child.material.roughness = mat.roughness;
       child.material.envMapIntensity = mat.envMapIntensity;

@@ -6,7 +6,7 @@
   <title>3D Necklace Designer</title>
   <style>
     :root {
-      --panel-width: 300px;
+      --panel-width: 320px;
       --bg-dark: #1a1a2e;
       --bg-panel: #16213e;
       --bg-input: #0f3460;
@@ -204,9 +204,53 @@
     .color-btn.rose { background: linear-gradient(135deg, #E8A090, #B76E79); color: #1a1a2e; }
     .color-btn.platinum { background: linear-gradient(135deg, #E5E4E2, #A9A9A9); color: #1a1a2e; }
 
-    /* Export Button */
+    /* Color picker row */
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .color-row input[type="color"] {
+      width: 36px;
+      height: 28px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg-input);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    /* Action Buttons */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin: 12px 20px;
+    }
+
+    .btn-action {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
     #export-btn {
-      margin: 20px;
+      margin: 8px 20px;
       padding: 14px;
       background: linear-gradient(135deg, var(--gold), #B8860B);
       color: #1a1a2e;
@@ -227,6 +271,42 @@
 
     #export-btn:active {
       transform: translateY(0);
+    }
+
+    /* File input styling */
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      width: 100%;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .file-input-label {
+      display: block;
+      padding: 8px 12px;
+      background: var(--bg-input);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .file-input-label:hover {
+      border-color: var(--gold);
+      color: var(--text);
     }
 
     /* Viewport */
@@ -287,6 +367,28 @@
       pointer-events: none;
       opacity: 0.6;
     }
+
+    /* Dimensions display */
+    #dimensions-display {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(22, 33, 62, 0.85);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gold);
+      letter-spacing: 1px;
+      pointer-events: none;
+      display: block;
+    }
+
+    /* Scrollbar styling */
+    #panel::-webkit-scrollbar { width: 6px; }
+    #panel::-webkit-scrollbar-track { background: var(--bg-panel); }
+    #panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #panel::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
   </style>
 </head>
 <body>
@@ -305,12 +407,38 @@
           <input type="text" id="text-input" value="KING" maxlength="12" spellcheck="false">
         </div>
         <div class="control-group">
+          <label for="second-line-input">Second Line</label>
+          <input type="text" id="second-line-input" value="" maxlength="16" spellcheck="false" placeholder="Optional subtitle">
+        </div>
+        <div class="control-group">
           <label for="font-select">Font</label>
           <select id="font-select">
             <option value="helvetiker_bold">Helvetiker Bold</option>
             <option value="optimer_bold">Optimer Bold</option>
             <option value="gentilis_bold">Gentilis Bold</option>
           </select>
+        </div>
+        <div class="control-group">
+          <label for="text-alignment">Alignment</label>
+          <select id="text-alignment">
+            <option value="left">Left</option>
+            <option value="center" selected>Center</option>
+            <option value="right">Right</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Letter Spacing</label>
+          <div class="slider-row">
+            <input type="range" id="letter-spacing" min="-3" max="10" value="0" step="0.5">
+            <span class="slider-value" id="letter-spacing-val">0</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Text Curve</label>
+          <div class="slider-row">
+            <input type="range" id="text-curve" min="-2" max="2" value="0" step="0.1">
+            <span class="slider-value" id="text-curve-val">0</span>
+          </div>
         </div>
       </div>
 
@@ -325,6 +453,13 @@
           </div>
         </div>
         <div class="control-group">
+          <label>Second Line Size</label>
+          <div class="slider-row">
+            <input type="range" id="second-line-size" min="6" max="40" value="16" step="1">
+            <span class="slider-value" id="second-line-size-val">16</span>
+          </div>
+        </div>
+        <div class="control-group">
           <label>Extrude Depth</label>
           <div class="slider-row">
             <input type="range" id="extrude-depth" min="2" max="20" value="8" step="1">
@@ -335,6 +470,12 @@
           <div class="checkbox-row">
             <input type="checkbox" id="bevel-toggle" checked>
             <label for="bevel-toggle">Bevel Edges</label>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="engrave-toggle">
+            <label for="engrave-toggle">Engrave Text</label>
           </div>
         </div>
       </div>
@@ -352,11 +493,19 @@
             <option value="shield">Shield</option>
             <option value="heart">Heart</option>
             <option value="star">Star</option>
+            <option value="custom">Custom (SVG)</option>
           </select>
+        </div>
+        <div class="control-group">
+          <label>Import SVG Shape</label>
+          <div class="file-input-wrapper">
+            <span class="file-input-label">Choose SVG file...</span>
+            <input type="file" id="svg-import" accept=".svg">
+          </div>
         </div>
       </div>
 
-      <!-- Pendant Plate -->
+      <!-- Backing Plate -->
       <div class="section">
         <div class="section-title">Backing Plate</div>
         <div class="control-group">
@@ -378,6 +527,13 @@
           <div class="slider-row">
             <input type="range" id="plate-thickness" min="1" max="10" value="3" step="0.5">
             <span class="slider-value" id="plate-thickness-val">3</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Border Width</label>
+          <div class="slider-row">
+            <input type="range" id="border-width" min="0" max="8" value="0" step="0.5">
+            <span class="slider-value" id="border-width-val">0</span>
           </div>
         </div>
       </div>
@@ -425,11 +581,17 @@
             <span class="slider-value" id="chain-scale-val">1.0</span>
           </div>
         </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="hide-chain-toggle">
+            <label for="hide-chain-toggle">Hide Chain</label>
+          </div>
+        </div>
       </div>
 
-      <!-- Material -->
+      <!-- Pendant Material -->
       <div class="section">
-        <div class="section-title">Material</div>
+        <div class="section-title">Pendant Material</div>
         <div class="control-presets">
           <div class="color-presets">
             <button class="color-btn gold active" data-color="gold">Gold</button>
@@ -438,9 +600,87 @@
             <button class="color-btn platinum" data-color="platinum">Platinum</button>
           </div>
         </div>
+        <div class="control-group" style="margin-top:10px">
+          <div class="checkbox-row">
+            <input type="checkbox" id="use-custom-color">
+            <label for="use-custom-color">Custom Color</label>
+          </div>
+          <div class="color-row">
+            <input type="color" id="custom-color" value="#FFD700">
+            <span style="font-size:11px;color:var(--text-dim)">Pick any color</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="matte-toggle">
+            <label for="matte-toggle">Matte Finish</label>
+          </div>
+        </div>
       </div>
 
-      <button id="export-btn">Export STL</button>
+      <!-- Two-Tone Chain Material -->
+      <div class="section">
+        <div class="section-title">Two-Tone Chain</div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="two-tone-toggle">
+            <label for="two-tone-toggle">Enable Two-Tone</label>
+          </div>
+        </div>
+        <div class="control-presets" style="margin-top:8px">
+          <div class="color-presets">
+            <button class="color-btn chain-color-btn gold active" data-color="gold">Gold</button>
+            <button class="color-btn chain-color-btn silver" data-color="silver">Silver</button>
+            <button class="color-btn chain-color-btn rose" data-color="rose">Rose Gold</button>
+            <button class="color-btn chain-color-btn platinum" data-color="platinum">Platinum</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Viewport / Display -->
+      <div class="section">
+        <div class="section-title">Display</div>
+        <div class="control-group">
+          <label>Background Color</label>
+          <div class="color-row">
+            <input type="color" id="bg-color" value="#1a1a2e">
+            <span style="font-size:11px;color:var(--text-dim)">Viewport background</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="show-dimensions-toggle" checked>
+            <label for="show-dimensions-toggle">Show Dimensions</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export -->
+      <div class="section">
+        <div class="section-title">Export</div>
+        <div class="control-group">
+          <label for="export-format">Format</label>
+          <select id="export-format">
+            <option value="stl" selected>STL</option>
+            <option value="obj">OBJ</option>
+            <option value="glb">GLB</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="export-btn">Export Model</button>
+
+      <div class="btn-row">
+        <button class="btn-action" id="screenshot-btn">Screenshot</button>
+        <button class="btn-action" id="reset-btn">Reset All</button>
+      </div>
+
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn-action" id="save-preset-btn">Save Preset</button>
+        <button class="btn-action" id="load-preset-btn">Load Preset</button>
+      </div>
+
+      <div style="height:20px"></div>
     </div>
 
     <div id="viewport">
@@ -448,6 +688,7 @@
         <div class="spinner"></div>
         <p>Loading chain model...</p>
       </div>
+      <div id="dimensions-display"></div>
       <div id="viewport-hint">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</div>
     </div>
   </div>

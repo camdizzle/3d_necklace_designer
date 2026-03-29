@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { MATERIALS } from './constants.js';
+import { createMaterial } from './pendantGenerator.js';
 
 function findChainAttachPoint(geometry) {
   const pos = geometry.attributes.position;
