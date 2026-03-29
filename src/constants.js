@@ -71,6 +71,13 @@ export const DEFAULTS = {
   borderWidth: 0,
   customShapePoints: null,
 
+  // Image features
+  imageThreshold: 128,
+  reliefData: null,
+  reliefHeight: 3,
+  reliefResolution: 64,
+  reliefInvert: false,
+
   // Chain
   hideChain: false,
 
