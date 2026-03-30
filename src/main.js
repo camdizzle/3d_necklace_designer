@@ -5,6 +5,7 @@ import { generatePendant, updateMaterialOnGroup, createMaterial } from './pendan
 import { exportByFormat, takeScreenshot, computeDimensions } from './exporter.js';
 import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
+import { traceImageSilhouette, createHeightmapData } from './imageProcessor.js';
 
 const viewport = document.getElementById('viewport');
 const loading = document.getElementById('loading');
@@ -21,6 +22,8 @@ let chainMesh = null;
 let chainSize = null;
 let chainInfo = null;
 let pendantGroup = null;
+let silhouetteImageFile = null;
+let reliefImageFile = null;
 
 function getMaterialOpts(state) {
   return {
@@ -124,7 +127,9 @@ async function rebuildPendant(state) {
     secondLineSize: state.secondLineSize,
     engrave: state.engrave,
     borderWidth: state.borderWidth,
-    customShapePoints: state.customShapePoints
+    customShapePoints: state.customShapePoints,
+    reliefData: state.reliefData,
+    reliefHeight: state.reliefHeight
   }, getMaterialOpts(state), scaledChainInfo);
 
   if (!result) return;
@@ -211,6 +216,36 @@ const state = initUI(async (newState, changedKey) => {
     return;
   }
 
+  // Re-trace silhouette when threshold changes
+  if (changedKey === 'imageThreshold' && silhouetteImageFile) {
+    try {
+      const points = await traceImageSilhouette(silhouetteImageFile, { threshold: newState.imageThreshold });
+      if (points.length >= 3) {
+        newState.customShapePoints = points;
+        newState.pendantShape = 'custom';
+      }
+    } catch (err) {
+      console.error('Re-trace failed:', err);
+    }
+    await rebuildPendant(newState);
+    return;
+  }
+
+  // Re-generate heightmap when resolution or invert changes
+  if (['reliefResolution', 'reliefInvert'].includes(changedKey) && reliefImageFile) {
+    try {
+      const heightmap = await createHeightmapData(reliefImageFile, {
+        resolution: newState.reliefResolution,
+        invert: newState.reliefInvert
+      });
+      newState.reliefData = heightmap;
+    } catch (err) {
+      console.error('Heightmap regeneration failed:', err);
+    }
+    await rebuildPendant(newState);
+    return;
+  }
+
   // Everything else triggers a full rebuild
   await rebuildPendant(newState);
 });
@@ -242,8 +277,9 @@ if (savePresetBtn) {
     const name = prompt('Preset name:');
     if (!name) return;
     const presets = JSON.parse(localStorage.getItem('necklace_presets') || '{}');
-    // Save serializable state (exclude customShapePoints if too large)
+    // Save serializable state (exclude non-serializable data)
     const saveState = { ...state };
+    delete saveState.reliefData;
     presets[name] = saveState;
     localStorage.setItem('necklace_presets', JSON.stringify(presets));
     window.dispatchEvent(new CustomEvent('presets-updated'));
@@ -323,6 +359,49 @@ if (svgInput) {
     } catch (err) {
       console.error('SVG parse error:', err);
       alert('Failed to parse SVG file.');
+    }
+  });
+}
+
+// Image silhouette import
+const imageSilhouetteInput = document.getElementById('image-silhouette-import');
+if (imageSilhouetteInput) {
+  imageSilhouetteInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    silhouetteImageFile = file;
+    try {
+      const threshold = state.imageThreshold || 128;
+      const points = await traceImageSilhouette(file, { threshold });
+      if (points.length < 3) {
+        alert('Could not extract a silhouette from this image. Try adjusting the threshold.');
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('svg-shape-loaded', { detail: points }));
+    } catch (err) {
+      console.error('Image silhouette error:', err);
+      alert('Failed to process image for silhouette.');
+    }
+  });
+}
+
+// Image relief / heightmap import
+const imageReliefInput = document.getElementById('image-relief-import');
+if (imageReliefInput) {
+  imageReliefInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    reliefImageFile = file;
+    try {
+      const heightmap = await createHeightmapData(file, {
+        resolution: state.reliefResolution || 64,
+        invert: state.reliefInvert || false
+      });
+      state.reliefData = heightmap;
+      await rebuildPendant(state);
+    } catch (err) {
+      console.error('Image relief error:', err);
+      alert('Failed to process image for relief.');
     }
   });
 }

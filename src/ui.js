@@ -98,6 +98,12 @@ export function initUI(onChange) {
   bindSlider('border-width', 'borderWidth', parseFloat);
   bindCheckbox('engrave-toggle', 'engrave');
 
+  // Image features
+  bindSlider('image-threshold', 'imageThreshold', parseInt);
+  bindSlider('relief-height', 'reliefHeight', parseFloat);
+  bindSlider('relief-resolution', 'reliefResolution', parseInt);
+  bindCheckbox('relief-invert-toggle', 'reliefInvert');
+
   // Bevel toggle
   bindCheckbox('bevel-toggle', 'bevelEnabled');
 
@@ -183,7 +189,10 @@ export function initUI(onChange) {
       'letter-spacing': DEFAULTS.letterSpacing,
       'text-curve': DEFAULTS.textCurve,
       'second-line-size': DEFAULTS.secondLineSize,
-      'border-width': DEFAULTS.borderWidth
+      'border-width': DEFAULTS.borderWidth,
+      'image-threshold': DEFAULTS.imageThreshold,
+      'relief-height': DEFAULTS.reliefHeight,
+      'relief-resolution': DEFAULTS.reliefResolution
     };
     for (const [id, val] of Object.entries(sliders)) {
       const slider = document.getElementById(id);
@@ -199,6 +208,7 @@ export function initUI(onChange) {
       'matte-toggle': DEFAULTS.matteFinish,
       'two-tone-toggle': DEFAULTS.twoTone,
       'hide-chain-toggle': DEFAULTS.hideChain,
+      'relief-invert-toggle': DEFAULTS.reliefInvert,
       'show-dimensions-toggle': DEFAULTS.showDimensions,
       'use-custom-color': DEFAULTS.useCustomColor
     };
@@ -261,7 +271,10 @@ export function initUI(onChange) {
       'letter-spacing': state.letterSpacing,
       'text-curve': state.textCurve,
       'second-line-size': state.secondLineSize,
-      'border-width': state.borderWidth
+      'border-width': state.borderWidth,
+      'image-threshold': state.imageThreshold,
+      'relief-height': state.reliefHeight,
+      'relief-resolution': state.reliefResolution
     };
     for (const [id, val] of Object.entries(sliders)) {
       const slider = document.getElementById(id);

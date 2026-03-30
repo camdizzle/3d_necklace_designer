@@ -505,6 +505,52 @@
         </div>
       </div>
 
+      <!-- Image Import -->
+      <div class="section">
+        <div class="section-title">Image Import</div>
+        <div class="control-group">
+          <label>Image Silhouette Shape</label>
+          <div class="file-input-wrapper">
+            <span class="file-input-label">Choose image for silhouette...</span>
+            <input type="file" id="image-silhouette-import" accept="image/png,image/jpeg,image/gif,image/webp">
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Threshold</label>
+          <div class="slider-row">
+            <input type="range" id="image-threshold" min="1" max="254" value="128" step="1">
+            <span class="slider-value" id="image-threshold-val">128</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Image Relief / Heightmap</label>
+          <div class="file-input-wrapper">
+            <span class="file-input-label">Choose image for relief...</span>
+            <input type="file" id="image-relief-import" accept="image/png,image/jpeg,image/gif,image/webp">
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Relief Height</label>
+          <div class="slider-row">
+            <input type="range" id="relief-height" min="0.5" max="10" value="3" step="0.5">
+            <span class="slider-value" id="relief-height-val">3</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Relief Resolution</label>
+          <div class="slider-row">
+            <input type="range" id="relief-resolution" min="16" max="128" value="64" step="16">
+            <span class="slider-value" id="relief-resolution-val">64</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="relief-invert-toggle">
+            <label for="relief-invert-toggle">Invert Relief</label>
+          </div>
+        </div>
+      </div>
+
       <!-- Backing Plate -->
       <div class="section">
         <div class="section-title">Backing Plate</div>

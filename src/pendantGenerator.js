@@ -264,7 +264,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     secondLineSize = 16,
     engrave = false,
     borderWidth = 0,
-    customShapePoints = null
+    customShapePoints = null,
+    reliefData = null,
+    reliefHeight = 3
   } = params;
 
   if (!text || text.trim().length === 0) return null;
@@ -382,6 +384,31 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
     const borderMesh = new THREE.Mesh(borderGeo, material.clone());
     group.add(borderMesh);
+  }
+
+  // Relief / heightmap overlay
+  if (reliefData && reliefData.data) {
+    const resW = reliefData.width;
+    const resH = reliefData.height;
+    const planeGeo = new THREE.PlaneGeometry(plateW, plateH, resW - 1, resH - 1);
+    const pos = planeGeo.attributes.position;
+
+    for (let iy = 0; iy < resH; iy++) {
+      for (let ix = 0; ix < resW; ix++) {
+        const vertIdx = iy * resW + ix;
+        // Heightmap data is top-to-bottom, plane vertices are bottom-to-top
+        const dataIdx = (resH - 1 - iy) * resW + ix;
+        const h = reliefData.data[dataIdx] * reliefHeight;
+        pos.setZ(vertIdx, h);
+      }
+    }
+
+    planeGeo.computeVertexNormals();
+
+    const reliefMesh = new THREE.Mesh(planeGeo, material.clone());
+    // Position on plate front surface
+    reliefMesh.position.z = plateThickness - 0.5;
+    group.add(reliefMesh);
   }
 
   const pendantTop = plateH / 2;
