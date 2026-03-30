@@ -269,78 +269,86 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     reliefHeight = 3
   } = params;
 
-  if (!text || text.trim().length === 0) return null;
+  const hasText = text && text.trim().length > 0;
+  const hasImage = reliefData && reliefData.data;
 
-  const font = await loadFont(fontKey);
+  // Need at least text or an image to render
+  if (!hasText && !hasImage) return null;
+
   const group = new THREE.Group();
   group.name = 'pendant';
 
   const material = createMaterial(materialOpts.key || 'gold', materialOpts);
 
-  // Create primary text
-  const usePerChar = letterSpacing !== 0 || textCurve !== 0;
-  const textResult = usePerChar
-    ? createCharacterMeshes(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
-    : createSingleTextMesh(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, material.clone());
+  let totalTextWidth = 0;
+  let totalTextHeight = 0;
+  let textGroup = null;
 
-  const textGroup = textResult.group;
-  let totalTextWidth = textResult.width;
-  let totalTextHeight = textResult.height;
+  if (hasText) {
+    const font = await loadFont(fontKey);
 
-  // Create second line if provided
-  let secondLineResult = null;
-  if (secondLineText && secondLineText.trim().length > 0) {
-    const sl = usePerChar
-      ? createCharacterMeshes(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
-      : createSingleTextMesh(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, material.clone());
+    // Create primary text
+    const usePerChar = letterSpacing !== 0 || textCurve !== 0;
+    const textResult = usePerChar
+      ? createCharacterMeshes(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
+      : createSingleTextMesh(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, material.clone());
 
-    // Position second line below first, then vertically center the combined block
-    const gap = textSize * 0.3;
-    const secondBlockHeight = gap + sl.height;
-    sl.group.position.y = -(totalTextHeight / 2 + gap + sl.height / 2);
-    textGroup.add(sl.group);
+    textGroup = textResult.group;
+    totalTextWidth = textResult.width;
+    totalTextHeight = textResult.height;
 
-    totalTextWidth = Math.max(totalTextWidth, sl.width);
-    totalTextHeight += secondBlockHeight;
+    // Create second line if provided
+    if (secondLineText && secondLineText.trim().length > 0) {
+      const sl = usePerChar
+        ? createCharacterMeshes(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
+        : createSingleTextMesh(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, material.clone());
 
-    // Shift entire text group up so the combined block is vertically centered
-    textGroup.position.y = secondBlockHeight / 2;
-    secondLineResult = sl;
+      const gap = textSize * 0.3;
+      const secondBlockHeight = gap + sl.height;
+      sl.group.position.y = -(totalTextHeight / 2 + gap + sl.height / 2);
+      textGroup.add(sl.group);
+
+      totalTextWidth = Math.max(totalTextWidth, sl.width);
+      totalTextHeight += secondBlockHeight;
+
+      textGroup.position.y = secondBlockHeight / 2;
+    }
+
+    // Position text on plate surface
+    const plateFrontZ = plateThickness - 0.5;
+    if (engrave) {
+      textGroup.position.z = plateFrontZ - extrudeDepth + 0.3;
+      textGroup.traverse((child) => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.material.color.multiplyScalar(0.6);
+        }
+      });
+    } else {
+      textGroup.position.z = plateFrontZ;
+    }
   }
 
-  // Position text on plate surface
-  const plateFrontZ = plateThickness - 0.5;
-  if (engrave) {
-    // Engrave: push text slightly into plate surface
-    textGroup.position.z = plateFrontZ - extrudeDepth + 0.3;
-    // Darken the engraved text slightly for visual distinction
-    textGroup.traverse((child) => {
-      if (child.isMesh) {
-        child.material = child.material.clone();
-        child.material.color.multiplyScalar(0.6);
-      }
-    });
-  } else {
-    textGroup.position.z = plateFrontZ;
-  }
-
-  // Apply text alignment offset (applied after plate is created)
-  let textAlignOffset = 0;
-
-  // Create backing plate with selected shape
-  const rawW = totalTextWidth + platePadding * 2;
-  const rawH = totalTextHeight + platePadding * 2;
+  // Plate sizing: use text bounds if available, otherwise default size for image-only
+  const defaultImageSize = 60;
+  const contentW = hasText ? totalTextWidth : defaultImageSize;
+  const contentH = hasText ? totalTextHeight : defaultImageSize;
+  const rawW = contentW + platePadding * 2;
+  const rawH = contentH + platePadding * 2;
   const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
     pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
   );
 
   // Apply text alignment
-  if (textAlignment === 'left') {
-    textAlignOffset = -(plateW / 2 - platePadding - totalTextWidth / 2);
-  } else if (textAlignment === 'right') {
-    textAlignOffset = (plateW / 2 - platePadding - totalTextWidth / 2);
+  if (hasText) {
+    let textAlignOffset = 0;
+    if (textAlignment === 'left') {
+      textAlignOffset = -(plateW / 2 - platePadding - totalTextWidth / 2);
+    } else if (textAlignment === 'right') {
+      textAlignOffset = (plateW / 2 - platePadding - totalTextWidth / 2);
+    }
+    textGroup.position.x = textAlignOffset;
   }
-  textGroup.position.x = textAlignOffset;
 
   const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
     depth: plateThickness,
@@ -355,7 +363,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   plateMesh.material.roughness = (materialOpts.matteFinish ? 0.7 : (MATERIALS[materialOpts.key]?.roughness || 0.25)) + 0.1;
 
   group.add(plateMesh);
-  group.add(textGroup);
+  if (textGroup) group.add(textGroup);
 
   // Border / frame
   if (borderWidth > 0) {
