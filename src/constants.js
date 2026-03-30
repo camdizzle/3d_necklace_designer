@@ -77,6 +77,7 @@ export const DEFAULTS = {
   reliefHeight: 3,
   reliefResolution: 64,
   reliefInvert: false,
+  customSTLGeometry: null,
 
   // Chain
   hideChain: false,

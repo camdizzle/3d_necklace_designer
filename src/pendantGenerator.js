@@ -266,8 +266,68 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     borderWidth = 0,
     customShapePoints = null,
     reliefData = null,
-    reliefHeight = 3
+    reliefHeight = 3,
+    customSTLGeometry = null
   } = params;
+
+  // Custom STL replaces the entire plate+text pendant
+  if (customSTLGeometry) {
+    const group = new THREE.Group();
+    group.name = 'pendant';
+
+    const material = createMaterial(materialOpts.key || 'gold', materialOpts);
+    const geo = customSTLGeometry.clone();
+    geo.computeBoundingBox();
+    geo.center();
+    geo.computeVertexNormals();
+
+    const box = geo.boundingBox;
+    const stlW = box.max.x - box.min.x;
+    const stlH = box.max.y - box.min.y;
+    const stlD = box.max.z - box.min.z;
+
+    const mesh = new THREE.Mesh(geo, material);
+    group.add(mesh);
+
+    const pendantTop = stlH / 2;
+
+    if (chainInfo) {
+      const { innerTopY, chainThickness } = chainInfo;
+      const bevelClear = 1.0;
+      const connGap = chainThickness * 0.3;
+      const pendantCenterY = innerTopY - pendantTop - connGap;
+      const stlMidZ = 0; // centered geometry
+
+      const connLocalBottom = pendantTop + bevelClear;
+      const connLocalTop = innerTopY - pendantCenterY;
+      const connHeight = connLocalTop - connLocalBottom;
+
+      if (connHeight > 0) {
+        const connWidth = chainThickness * 0.5;
+        const connDepth = stlD + 1;
+        const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
+        connGeo.translate(0, connLocalBottom + connHeight / 2, stlMidZ);
+        const connMesh = new THREE.Mesh(connGeo, material.clone());
+        group.add(connMesh);
+      }
+
+      return {
+        group,
+        width: stlW,
+        height: stlH,
+        pendantCenterY,
+        defaultZ: 0
+      };
+    }
+
+    return {
+      group,
+      width: stlW,
+      height: stlH,
+      pendantCenterY: 0,
+      defaultZ: 0
+    };
+  }
 
   const hasText = text && text.trim().length > 0;
   const hasImage = reliefData && reliefData.data;
