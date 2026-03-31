@@ -63,20 +63,27 @@ export const DEFAULTS = {
   font: 'helvetiker_bold',
   textSize: 24,
   textCurve: 0,
+  textOffsetX: 0,
+  textOffsetY: 0,
 
   // Line 2
   secondLineText: '',
   secondLineFont: 'helvetiker_bold',
   secondLineSize: 16,
   secondLineCurve: 0,
+  secondLineOffsetX: 0,
+  secondLineOffsetY: 0,
 
   // Line 3
   thirdLineText: '',
   thirdLineFont: 'helvetiker_bold',
   thirdLineSize: 14,
   thirdLineCurve: 0,
+  thirdLineOffsetX: 0,
+  thirdLineOffsetY: 0,
 
   // Shared text settings
+  lineSpacing: 1.0,
   letterSpacing: 0,
   textAlignment: 'center',
   extrudeDepth: 8,

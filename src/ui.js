@@ -60,20 +60,27 @@ export function initUI(onChange) {
   bindSelect('font-select', 'font');
   bindSlider('text-size', 'textSize', parseInt);
   bindSlider('text-curve', 'textCurve', parseFloat);
+  bindSlider('text-offset-x', 'textOffsetX', parseFloat);
+  bindSlider('text-offset-y', 'textOffsetY', parseFloat);
 
   // --- Line 2 ---
   bindTextInput('second-line-input', 'secondLineText');
   bindSelect('second-line-font', 'secondLineFont');
   bindSlider('second-line-size', 'secondLineSize', parseInt);
   bindSlider('second-line-curve', 'secondLineCurve', parseFloat);
+  bindSlider('second-line-offset-x', 'secondLineOffsetX', parseFloat);
+  bindSlider('second-line-offset-y', 'secondLineOffsetY', parseFloat);
 
   // --- Line 3 ---
   bindTextInput('third-line-input', 'thirdLineText');
   bindSelect('third-line-font', 'thirdLineFont');
   bindSlider('third-line-size', 'thirdLineSize', parseInt);
   bindSlider('third-line-curve', 'thirdLineCurve', parseFloat);
+  bindSlider('third-line-offset-x', 'thirdLineOffsetX', parseFloat);
+  bindSlider('third-line-offset-y', 'thirdLineOffsetY', parseFloat);
 
   // --- Shared text ---
+  bindSlider('line-spacing', 'lineSpacing', parseFloat);
   bindSlider('letter-spacing', 'letterSpacing', parseFloat);
   bindSelect('text-alignment', 'textAlignment');
   bindSlider('extrude-depth', 'extrudeDepth', parseInt);
@@ -167,10 +174,17 @@ export function initUI(onChange) {
   const allSliders = {
     'text-size': 'textSize',
     'text-curve': 'textCurve',
+    'text-offset-x': 'textOffsetX',
+    'text-offset-y': 'textOffsetY',
     'second-line-size': 'secondLineSize',
     'second-line-curve': 'secondLineCurve',
+    'second-line-offset-x': 'secondLineOffsetX',
+    'second-line-offset-y': 'secondLineOffsetY',
     'third-line-size': 'thirdLineSize',
     'third-line-curve': 'thirdLineCurve',
+    'third-line-offset-x': 'thirdLineOffsetX',
+    'third-line-offset-y': 'thirdLineOffsetY',
+    'line-spacing': 'lineSpacing',
     'letter-spacing': 'letterSpacing',
     'extrude-depth': 'extrudeDepth',
     'plate-padding': 'platePadding',
