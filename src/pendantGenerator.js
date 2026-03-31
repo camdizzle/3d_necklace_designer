@@ -252,22 +252,29 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     font: fontKey,
     textSize,
     textCurve = 0,
+    textOffsetX = 0,
+    textOffsetY = 0,
     extrudeDepth,
     bevelEnabled,
     platePadding,
     plateRadius,
     plateThickness,
     pendantShape,
+    lineSpacing = 1.0,
     letterSpacing = 0,
     textAlignment = 'center',
     secondLineText = '',
     secondLineFont = 'helvetiker_bold',
     secondLineSize = 16,
     secondLineCurve = 0,
+    secondLineOffsetX = 0,
+    secondLineOffsetY = 0,
     thirdLineText = '',
     thirdLineFont = 'helvetiker_bold',
     thirdLineSize = 14,
     thirdLineCurve = 0,
+    thirdLineOffsetX = 0,
+    thirdLineOffsetY = 0,
     engrave = false,
     borderWidth = 0,
     customShapePoints = null,
@@ -335,16 +342,16 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     };
   }
 
-  // Build lines array: each line has text, font key, size, curve
+  // Build lines array: each line has text, font key, size, curve, offsets
   const lines = [];
   if (text && text.trim().length > 0) {
-    lines.push({ text: text.trim(), fontKey, size: textSize, curve: textCurve });
+    lines.push({ text: text.trim(), fontKey, size: textSize, curve: textCurve, offsetX: textOffsetX, offsetY: textOffsetY });
   }
   if (secondLineText && secondLineText.trim().length > 0) {
-    lines.push({ text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve });
+    lines.push({ text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve, offsetX: secondLineOffsetX, offsetY: secondLineOffsetY });
   }
   if (thirdLineText && thirdLineText.trim().length > 0) {
-    lines.push({ text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve });
+    lines.push({ text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve, offsetX: thirdLineOffsetX, offsetY: thirdLineOffsetY });
   }
 
   const hasText = lines.length > 0;
@@ -372,17 +379,19 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const result = usePerChar
         ? createCharacterMeshes(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material)
         : createSingleTextMesh(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, material.clone());
-      lineResults.push({ ...result, lineSize: line.size });
+      lineResults.push({ ...result, lineSize: line.size, offsetX: line.offsetX, offsetY: line.offsetY });
     }
 
     // Compute total dimensions and position each line
-    const lineGap = 0.3; // gap as fraction of preceding line size
+    // lineSpacing: 1.0 = default gap (0.3 * preceding line size), scale from there
+    const baseGapFactor = 0.3;
+    const gapFactor = baseGapFactor * lineSpacing;
     let totalH = 0;
     for (let i = 0; i < lineResults.length; i++) {
       const lr = lineResults[i];
       totalTextWidth = Math.max(totalTextWidth, lr.width);
       totalH += lr.height;
-      if (i > 0) totalH += lineResults[i - 1].lineSize * lineGap;
+      if (i > 0) totalH += lineResults[i - 1].lineSize * gapFactor;
     }
     totalTextHeight = totalH;
 
@@ -390,9 +399,10 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     let cursorY = totalTextHeight / 2;
     for (let i = 0; i < lineResults.length; i++) {
       const lr = lineResults[i];
-      if (i > 0) cursorY -= lineResults[i - 1].lineSize * lineGap;
+      if (i > 0) cursorY -= lineResults[i - 1].lineSize * gapFactor;
       cursorY -= lr.height / 2;
-      lr.group.position.y = cursorY;
+      lr.group.position.x = lr.offsetX;
+      lr.group.position.y = cursorY + lr.offsetY;
       cursorY -= lr.height / 2;
       textGroup.add(lr.group);
     }
