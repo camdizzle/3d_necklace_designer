@@ -399,25 +399,132 @@
         <p>3D Necklace Designer</p>
       </div>
 
-      <!-- Pendant Text -->
+      <!-- LINE 1 -->
       <div class="section">
-        <div class="section-title">Pendant Text</div>
+        <div class="section-title">Line 1</div>
         <div class="control-group">
           <label for="text-input">Text</label>
-          <input type="text" id="text-input" value="KING" maxlength="12" spellcheck="false">
-        </div>
-        <div class="control-group">
-          <label for="second-line-input">Second Line</label>
-          <input type="text" id="second-line-input" value="" maxlength="16" spellcheck="false" placeholder="Optional subtitle">
+          <input type="text" id="text-input" value="KING" maxlength="16" spellcheck="false">
         </div>
         <div class="control-group">
           <label for="font-select">Font</label>
           <select id="font-select">
-            <option value="helvetiker_bold">Helvetiker Bold</option>
+            <option value="helvetiker_bold" selected>Helvetiker Bold</option>
+            <option value="helvetiker_regular">Helvetiker</option>
             <option value="optimer_bold">Optimer Bold</option>
+            <option value="optimer_regular">Optimer</option>
             <option value="gentilis_bold">Gentilis Bold</option>
+            <option value="gentilis_regular">Gentilis</option>
+            <option value="droid_sans_bold">Droid Sans Bold</option>
+            <option value="droid_sans_regular">Droid Sans</option>
+            <option value="droid_serif_bold">Droid Serif Bold</option>
+            <option value="droid_serif_regular">Droid Serif</option>
+            <option value="dancing_script">Dancing Script</option>
+            <option value="pacifico">Pacifico</option>
+            <option value="great_vibes">Great Vibes</option>
           </select>
         </div>
+        <div class="control-group">
+          <label>Size</label>
+          <div class="slider-row">
+            <input type="range" id="text-size" min="8" max="50" value="24" step="1">
+            <span class="slider-value" id="text-size-val">24</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Curve</label>
+          <div class="slider-row">
+            <input type="range" id="text-curve" min="-2" max="2" value="0" step="0.1">
+            <span class="slider-value" id="text-curve-val">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINE 2 -->
+      <div class="section">
+        <div class="section-title">Line 2</div>
+        <div class="control-group">
+          <label for="second-line-input">Text</label>
+          <input type="text" id="second-line-input" value="" maxlength="20" spellcheck="false" placeholder="Optional">
+        </div>
+        <div class="control-group">
+          <label for="second-line-font">Font</label>
+          <select id="second-line-font">
+            <option value="helvetiker_bold" selected>Helvetiker Bold</option>
+            <option value="helvetiker_regular">Helvetiker</option>
+            <option value="optimer_bold">Optimer Bold</option>
+            <option value="optimer_regular">Optimer</option>
+            <option value="gentilis_bold">Gentilis Bold</option>
+            <option value="gentilis_regular">Gentilis</option>
+            <option value="droid_sans_bold">Droid Sans Bold</option>
+            <option value="droid_sans_regular">Droid Sans</option>
+            <option value="droid_serif_bold">Droid Serif Bold</option>
+            <option value="droid_serif_regular">Droid Serif</option>
+            <option value="dancing_script">Dancing Script</option>
+            <option value="pacifico">Pacifico</option>
+            <option value="great_vibes">Great Vibes</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Size</label>
+          <div class="slider-row">
+            <input type="range" id="second-line-size" min="6" max="40" value="16" step="1">
+            <span class="slider-value" id="second-line-size-val">16</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Curve</label>
+          <div class="slider-row">
+            <input type="range" id="second-line-curve" min="-2" max="2" value="0" step="0.1">
+            <span class="slider-value" id="second-line-curve-val">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINE 3 -->
+      <div class="section">
+        <div class="section-title">Line 3</div>
+        <div class="control-group">
+          <label for="third-line-input">Text</label>
+          <input type="text" id="third-line-input" value="" maxlength="20" spellcheck="false" placeholder="Optional">
+        </div>
+        <div class="control-group">
+          <label for="third-line-font">Font</label>
+          <select id="third-line-font">
+            <option value="helvetiker_bold" selected>Helvetiker Bold</option>
+            <option value="helvetiker_regular">Helvetiker</option>
+            <option value="optimer_bold">Optimer Bold</option>
+            <option value="optimer_regular">Optimer</option>
+            <option value="gentilis_bold">Gentilis Bold</option>
+            <option value="gentilis_regular">Gentilis</option>
+            <option value="droid_sans_bold">Droid Sans Bold</option>
+            <option value="droid_sans_regular">Droid Sans</option>
+            <option value="droid_serif_bold">Droid Serif Bold</option>
+            <option value="droid_serif_regular">Droid Serif</option>
+            <option value="dancing_script">Dancing Script</option>
+            <option value="pacifico">Pacifico</option>
+            <option value="great_vibes">Great Vibes</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Size</label>
+          <div class="slider-row">
+            <input type="range" id="third-line-size" min="6" max="40" value="14" step="1">
+            <span class="slider-value" id="third-line-size-val">14</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Curve</label>
+          <div class="slider-row">
+            <input type="range" id="third-line-curve" min="-2" max="2" value="0" step="0.1">
+            <span class="slider-value" id="third-line-curve-val">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEXT STYLE -->
+      <div class="section">
+        <div class="section-title">Text Style</div>
         <div class="control-group">
           <label for="text-alignment">Alignment</label>
           <select id="text-alignment">
@@ -431,32 +538,6 @@
           <div class="slider-row">
             <input type="range" id="letter-spacing" min="-3" max="10" value="0" step="0.5">
             <span class="slider-value" id="letter-spacing-val">0</span>
-          </div>
-        </div>
-        <div class="control-group">
-          <label>Text Curve</label>
-          <div class="slider-row">
-            <input type="range" id="text-curve" min="-2" max="2" value="0" step="0.1">
-            <span class="slider-value" id="text-curve-val">0</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pendant Size -->
-      <div class="section">
-        <div class="section-title">Pendant Size</div>
-        <div class="control-group">
-          <label>Text Size</label>
-          <div class="slider-row">
-            <input type="range" id="text-size" min="8" max="50" value="24" step="1">
-            <span class="slider-value" id="text-size-val">24</span>
-          </div>
-        </div>
-        <div class="control-group">
-          <label>Second Line Size</label>
-          <div class="slider-row">
-            <input type="range" id="second-line-size" min="6" max="40" value="16" step="1">
-            <span class="slider-value" id="second-line-size-val">16</span>
           </div>
         </div>
         <div class="control-group">
