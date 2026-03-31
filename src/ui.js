@@ -3,32 +3,7 @@ import { DEFAULTS } from './constants.js';
 export function initUI(onChange) {
   const state = { ...DEFAULTS };
 
-  // --- Text input ---
-  const textInput = document.getElementById('text-input');
-  let textDebounce;
-  textInput.addEventListener('input', () => {
-    clearTimeout(textDebounce);
-    textDebounce = setTimeout(() => {
-      state.text = textInput.value;
-      onChange(state, 'text');
-    }, 300);
-  });
-
-  // Font select
-  const fontSelect = document.getElementById('font-select');
-  fontSelect.addEventListener('change', () => {
-    state.font = fontSelect.value;
-    onChange(state, 'font');
-  });
-
-  // Shape select
-  const shapeSelect = document.getElementById('shape-select');
-  shapeSelect.addEventListener('change', () => {
-    state.pendantShape = shapeSelect.value;
-    onChange(state, 'pendantShape');
-  });
-
-  // --- Slider helper ---
+  // --- Helpers ---
   function bindSlider(id, key, transform = parseFloat) {
     const slider = document.getElementById(id);
     const valEl = document.getElementById(id + '-val');
@@ -41,7 +16,6 @@ export function initUI(onChange) {
     });
   }
 
-  // --- Checkbox helper ---
   function bindCheckbox(id, key) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -51,7 +25,6 @@ export function initUI(onChange) {
     });
   }
 
-  // --- Text debounce input helper ---
   function bindTextInput(id, key) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -65,7 +38,6 @@ export function initUI(onChange) {
     });
   }
 
-  // --- Select helper ---
   function bindSelect(id, key) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -75,53 +47,75 @@ export function initUI(onChange) {
     });
   }
 
-  // Pendant size sliders
+  // --- Line 1 ---
+  const textInput = document.getElementById('text-input');
+  let textDebounce;
+  textInput.addEventListener('input', () => {
+    clearTimeout(textDebounce);
+    textDebounce = setTimeout(() => {
+      state.text = textInput.value;
+      onChange(state, 'text');
+    }, 300);
+  });
+  bindSelect('font-select', 'font');
   bindSlider('text-size', 'textSize', parseInt);
+  bindSlider('text-curve', 'textCurve', parseFloat);
+
+  // --- Line 2 ---
+  bindTextInput('second-line-input', 'secondLineText');
+  bindSelect('second-line-font', 'secondLineFont');
+  bindSlider('second-line-size', 'secondLineSize', parseInt);
+  bindSlider('second-line-curve', 'secondLineCurve', parseFloat);
+
+  // --- Line 3 ---
+  bindTextInput('third-line-input', 'thirdLineText');
+  bindSelect('third-line-font', 'thirdLineFont');
+  bindSlider('third-line-size', 'thirdLineSize', parseInt);
+  bindSlider('third-line-curve', 'thirdLineCurve', parseFloat);
+
+  // --- Shared text ---
+  bindSlider('letter-spacing', 'letterSpacing', parseFloat);
+  bindSelect('text-alignment', 'textAlignment');
   bindSlider('extrude-depth', 'extrudeDepth', parseInt);
+  bindCheckbox('bevel-toggle', 'bevelEnabled');
+  bindCheckbox('engrave-toggle', 'engrave');
+
+  // --- Plate ---
   bindSlider('plate-padding', 'platePadding', parseInt);
   bindSlider('plate-radius', 'plateRadius', parseInt);
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
+  bindSlider('border-width', 'borderWidth', parseFloat);
+
+  // --- Shape ---
+  const shapeSelect = document.getElementById('shape-select');
+  shapeSelect.addEventListener('change', () => {
+    state.pendantShape = shapeSelect.value;
+    onChange(state, 'pendantShape');
+  });
+
+  // --- Pendant position ---
   bindSlider('pendant-scale', 'pendantScale', parseFloat);
   bindSlider('pendant-offset-x', 'pendantOffsetX', parseFloat);
   bindSlider('pendant-offset-y', 'pendantOffsetY', parseFloat);
   bindSlider('pendant-offset-z', 'pendantOffsetZ', parseFloat);
+
+  // --- Chain ---
   bindSlider('chain-scale', 'chainScale', parseFloat);
+  bindCheckbox('hide-chain-toggle', 'hideChain');
 
-  // Text features
-  bindSlider('letter-spacing', 'letterSpacing', parseFloat);
-  bindSlider('text-curve', 'textCurve', parseFloat);
-  bindSlider('second-line-size', 'secondLineSize', parseInt);
-  bindSelect('text-alignment', 'textAlignment');
-  bindTextInput('second-line-input', 'secondLineText');
-
-  // Plate features
-  bindSlider('border-width', 'borderWidth', parseFloat);
-  bindCheckbox('engrave-toggle', 'engrave');
-
-  // Image features
+  // --- Image ---
   bindSlider('image-threshold', 'imageThreshold', parseInt);
   bindSlider('relief-height', 'reliefHeight', parseFloat);
   bindSlider('relief-resolution', 'reliefResolution', parseInt);
   bindCheckbox('relief-invert-toggle', 'reliefInvert');
 
-  // Bevel toggle
-  bindCheckbox('bevel-toggle', 'bevelEnabled');
-
-  // Visual features
-  bindCheckbox('matte-toggle', 'matteFinish');
-  bindCheckbox('two-tone-toggle', 'twoTone');
-  bindCheckbox('hide-chain-toggle', 'hideChain');
-  bindCheckbox('show-dimensions-toggle', 'showDimensions');
-
-  // Custom color
+  // --- Material ---
   const customColorInput = document.getElementById('custom-color');
   const useCustomColorToggle = document.getElementById('use-custom-color');
   if (customColorInput) {
     customColorInput.addEventListener('input', () => {
       state.customColor = customColorInput.value;
-      if (state.useCustomColor) {
-        onChange(state, 'customColor');
-      }
+      if (state.useCustomColor) onChange(state, 'customColor');
     });
   }
   if (useCustomColorToggle) {
@@ -130,8 +124,9 @@ export function initUI(onChange) {
       onChange(state, 'useCustomColor');
     });
   }
+  bindCheckbox('matte-toggle', 'matteFinish');
+  bindCheckbox('two-tone-toggle', 'twoTone');
 
-  // Background color
   const bgColorInput = document.getElementById('bg-color');
   if (bgColorInput) {
     bgColorInput.addEventListener('input', () => {
@@ -151,10 +146,7 @@ export function initUI(onChange) {
     });
   });
 
-  // Export format
-  bindSelect('export-format', 'exportFormat');
-
-  // Color presets (pendant material)
+  // Pendant material presets
   const colorBtns = document.querySelectorAll('.color-btn:not(.chain-color-btn)');
   colorBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -165,163 +157,104 @@ export function initUI(onChange) {
     });
   });
 
-  // --- Reset to defaults ---
-  function resetAll() {
-    Object.assign(state, { ...DEFAULTS });
+  // Display
+  bindCheckbox('show-dimensions-toggle', 'showDimensions');
 
-    // Update all UI elements to match defaults
-    textInput.value = DEFAULTS.text;
-    fontSelect.value = DEFAULTS.font;
-    shapeSelect.value = DEFAULTS.pendantShape;
+  // Export
+  bindSelect('export-format', 'exportFormat');
 
-    // Update sliders
-    const sliders = {
-      'text-size': DEFAULTS.textSize,
-      'extrude-depth': DEFAULTS.extrudeDepth,
-      'plate-padding': DEFAULTS.platePadding,
-      'plate-radius': DEFAULTS.plateRadius,
-      'plate-thickness': DEFAULTS.plateThickness,
-      'pendant-scale': DEFAULTS.pendantScale,
-      'pendant-offset-x': DEFAULTS.pendantOffsetX,
-      'pendant-offset-y': DEFAULTS.pendantOffsetY,
-      'pendant-offset-z': DEFAULTS.pendantOffsetZ,
-      'chain-scale': DEFAULTS.chainScale,
-      'letter-spacing': DEFAULTS.letterSpacing,
-      'text-curve': DEFAULTS.textCurve,
-      'second-line-size': DEFAULTS.secondLineSize,
-      'border-width': DEFAULTS.borderWidth,
-      'image-threshold': DEFAULTS.imageThreshold,
-      'relief-height': DEFAULTS.reliefHeight,
-      'relief-resolution': DEFAULTS.reliefResolution
-    };
-    for (const [id, val] of Object.entries(sliders)) {
+  // --- All slider/checkbox/select IDs for reset/preset ---
+  const allSliders = {
+    'text-size': 'textSize',
+    'text-curve': 'textCurve',
+    'second-line-size': 'secondLineSize',
+    'second-line-curve': 'secondLineCurve',
+    'third-line-size': 'thirdLineSize',
+    'third-line-curve': 'thirdLineCurve',
+    'letter-spacing': 'letterSpacing',
+    'extrude-depth': 'extrudeDepth',
+    'plate-padding': 'platePadding',
+    'plate-radius': 'plateRadius',
+    'plate-thickness': 'plateThickness',
+    'border-width': 'borderWidth',
+    'pendant-scale': 'pendantScale',
+    'pendant-offset-x': 'pendantOffsetX',
+    'pendant-offset-y': 'pendantOffsetY',
+    'pendant-offset-z': 'pendantOffsetZ',
+    'chain-scale': 'chainScale',
+    'image-threshold': 'imageThreshold',
+    'relief-height': 'reliefHeight',
+    'relief-resolution': 'reliefResolution'
+  };
+
+  const allCheckboxes = {
+    'bevel-toggle': 'bevelEnabled',
+    'engrave-toggle': 'engrave',
+    'matte-toggle': 'matteFinish',
+    'two-tone-toggle': 'twoTone',
+    'hide-chain-toggle': 'hideChain',
+    'show-dimensions-toggle': 'showDimensions',
+    'use-custom-color': 'useCustomColor',
+    'relief-invert-toggle': 'reliefInvert'
+  };
+
+  const allSelects = {
+    'font-select': 'font',
+    'second-line-font': 'secondLineFont',
+    'third-line-font': 'thirdLineFont',
+    'text-alignment': 'textAlignment',
+    'shape-select': 'pendantShape',
+    'export-format': 'exportFormat'
+  };
+
+  const allTextInputs = {
+    'text-input': 'text',
+    'second-line-input': 'secondLineText',
+    'third-line-input': 'thirdLineText'
+  };
+
+  function syncUIFromState() {
+    for (const [id, key] of Object.entries(allSliders)) {
       const slider = document.getElementById(id);
       const valEl = document.getElementById(id + '-val');
-      if (slider) slider.value = val;
-      if (valEl) valEl.textContent = val;
+      if (slider) slider.value = state[key];
+      if (valEl) valEl.textContent = state[key];
     }
-
-    // Update checkboxes
-    const checkboxes = {
-      'bevel-toggle': DEFAULTS.bevelEnabled,
-      'engrave-toggle': DEFAULTS.engrave,
-      'matte-toggle': DEFAULTS.matteFinish,
-      'two-tone-toggle': DEFAULTS.twoTone,
-      'hide-chain-toggle': DEFAULTS.hideChain,
-      'relief-invert-toggle': DEFAULTS.reliefInvert,
-      'show-dimensions-toggle': DEFAULTS.showDimensions,
-      'use-custom-color': DEFAULTS.useCustomColor
-    };
-    for (const [id, val] of Object.entries(checkboxes)) {
+    for (const [id, key] of Object.entries(allCheckboxes)) {
       const el = document.getElementById(id);
-      if (el) el.checked = val;
+      if (el) el.checked = !!state[key];
     }
-
-    // Update selects
-    const selects = {
-      'text-alignment': DEFAULTS.textAlignment,
-      'export-format': DEFAULTS.exportFormat
-    };
-    for (const [id, val] of Object.entries(selects)) {
+    for (const [id, key] of Object.entries(allSelects)) {
       const el = document.getElementById(id);
-      if (el) el.value = val;
+      if (el) el.value = state[key];
     }
-
-    // Text inputs
-    const secondLineInput = document.getElementById('second-line-input');
-    if (secondLineInput) secondLineInput.value = DEFAULTS.secondLineText;
-
-    if (customColorInput) customColorInput.value = DEFAULTS.customColor;
-    if (bgColorInput) bgColorInput.value = DEFAULTS.backgroundColor;
-
-    // Reset color preset buttons
-    colorBtns.forEach(b => {
-      b.classList.toggle('active', b.dataset.color === DEFAULTS.material);
-    });
-    chainMatBtns.forEach(b => {
-      b.classList.toggle('active', b.dataset.color === DEFAULTS.chainMaterial);
-    });
-
-    onChange(state, 'reset');
+    for (const [id, key] of Object.entries(allTextInputs)) {
+      const el = document.getElementById(id);
+      if (el) el.value = state[key] || '';
+    }
+    if (customColorInput) customColorInput.value = state.customColor || DEFAULTS.customColor;
+    if (bgColorInput) bgColorInput.value = state.backgroundColor || DEFAULTS.backgroundColor;
+    colorBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.material));
+    chainMatBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.chainMaterial));
   }
 
-  window.addEventListener('reset-to-defaults', resetAll);
+  // Reset
+  window.addEventListener('reset-to-defaults', () => {
+    Object.assign(state, { ...DEFAULTS });
+    syncUIFromState();
+    onChange(state, 'reset');
+  });
 
-  // --- Load preset ---
+  // Load preset
   window.addEventListener('load-preset', (e) => {
     const preset = e.detail;
     if (!preset) return;
     Object.assign(state, preset);
-    // Re-sync UI (same as reset but with preset values)
-    textInput.value = state.text;
-    fontSelect.value = state.font;
-    shapeSelect.value = state.pendantShape;
-
-    const sliders = {
-      'text-size': state.textSize,
-      'extrude-depth': state.extrudeDepth,
-      'plate-padding': state.platePadding,
-      'plate-radius': state.plateRadius,
-      'plate-thickness': state.plateThickness,
-      'pendant-scale': state.pendantScale,
-      'pendant-offset-x': state.pendantOffsetX,
-      'pendant-offset-y': state.pendantOffsetY,
-      'pendant-offset-z': state.pendantOffsetZ,
-      'chain-scale': state.chainScale,
-      'letter-spacing': state.letterSpacing,
-      'text-curve': state.textCurve,
-      'second-line-size': state.secondLineSize,
-      'border-width': state.borderWidth,
-      'image-threshold': state.imageThreshold,
-      'relief-height': state.reliefHeight,
-      'relief-resolution': state.reliefResolution
-    };
-    for (const [id, val] of Object.entries(sliders)) {
-      const slider = document.getElementById(id);
-      const valEl = document.getElementById(id + '-val');
-      if (slider) slider.value = val;
-      if (valEl) valEl.textContent = val;
-    }
-
-    const checkboxes = {
-      'bevel-toggle': state.bevelEnabled,
-      'engrave-toggle': state.engrave,
-      'matte-toggle': state.matteFinish,
-      'two-tone-toggle': state.twoTone,
-      'hide-chain-toggle': state.hideChain,
-      'show-dimensions-toggle': state.showDimensions,
-      'use-custom-color': state.useCustomColor
-    };
-    for (const [id, val] of Object.entries(checkboxes)) {
-      const el = document.getElementById(id);
-      if (el) el.checked = !!val;
-    }
-
-    const selects = {
-      'text-alignment': state.textAlignment,
-      'export-format': state.exportFormat
-    };
-    for (const [id, val] of Object.entries(selects)) {
-      const el = document.getElementById(id);
-      if (el) el.value = val || DEFAULTS[Object.keys(DEFAULTS).find(k => k === id.replace(/-([a-z])/g, (_, c) => c.toUpperCase()))];
-    }
-
-    const secondLineInput = document.getElementById('second-line-input');
-    if (secondLineInput) secondLineInput.value = state.secondLineText || '';
-    if (customColorInput) customColorInput.value = state.customColor || DEFAULTS.customColor;
-    if (bgColorInput) bgColorInput.value = state.backgroundColor || DEFAULTS.backgroundColor;
-
-    colorBtns.forEach(b => {
-      b.classList.toggle('active', b.dataset.color === state.material);
-    });
-    chainMatBtns.forEach(b => {
-      b.classList.toggle('active', b.dataset.color === state.chainMaterial);
-    });
-
+    syncUIFromState();
     onChange(state, 'reset');
   });
 
-  // --- SVG shape loaded ---
+  // SVG shape loaded
   window.addEventListener('svg-shape-loaded', (e) => {
     state.customShapePoints = e.detail;
     state.pendantShape = 'custom';

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { createScene } from './scene.js';
 import { loadChain, updateChainMaterial } from './chainLoader.js';
 import { generatePendant, updateMaterialOnGroup, createMaterial } from './pendantGenerator.js';
@@ -114,6 +115,7 @@ async function rebuildPendant(state) {
     text: state.text,
     font: state.font,
     textSize: state.textSize,
+    textCurve: state.textCurve,
     extrudeDepth: state.extrudeDepth,
     bevelEnabled: state.bevelEnabled,
     platePadding: state.platePadding,
@@ -122,14 +124,20 @@ async function rebuildPendant(state) {
     pendantShape: state.pendantShape,
     letterSpacing: state.letterSpacing,
     textAlignment: state.textAlignment,
-    textCurve: state.textCurve,
     secondLineText: state.secondLineText,
+    secondLineFont: state.secondLineFont,
     secondLineSize: state.secondLineSize,
+    secondLineCurve: state.secondLineCurve,
+    thirdLineText: state.thirdLineText,
+    thirdLineFont: state.thirdLineFont,
+    thirdLineSize: state.thirdLineSize,
+    thirdLineCurve: state.thirdLineCurve,
     engrave: state.engrave,
     borderWidth: state.borderWidth,
     customShapePoints: state.customShapePoints,
     reliefData: state.reliefData,
-    reliefHeight: state.reliefHeight
+    reliefHeight: state.reliefHeight,
+    customSTLGeometry: state.customSTLGeometry
   }, getMaterialOpts(state), scaledChainInfo);
 
   if (!result) return;
@@ -280,6 +288,7 @@ if (savePresetBtn) {
     // Save serializable state (exclude non-serializable data)
     const saveState = { ...state };
     delete saveState.reliefData;
+    delete saveState.customSTLGeometry;
     presets[name] = saveState;
     localStorage.setItem('necklace_presets', JSON.stringify(presets));
     window.dispatchEvent(new CustomEvent('presets-updated'));
@@ -402,6 +411,26 @@ if (imageReliefInput) {
     } catch (err) {
       console.error('Image relief error:', err);
       alert('Failed to process image for relief.');
+    }
+  });
+}
+
+// STL pendant import
+const stlImportInput = document.getElementById('stl-import');
+if (stlImportInput) {
+  stlImportInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const loader = new STLLoader();
+      const geometry = loader.parse(buffer);
+      geometry.computeVertexNormals();
+      state.customSTLGeometry = geometry;
+      await rebuildPendant(state);
+    } catch (err) {
+      console.error('STL import error:', err);
+      alert('Failed to load STL file.');
     }
   });
 }

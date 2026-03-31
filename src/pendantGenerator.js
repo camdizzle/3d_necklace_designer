@@ -251,6 +251,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     text,
     font: fontKey,
     textSize,
+    textCurve = 0,
     extrudeDepth,
     bevelEnabled,
     platePadding,
@@ -259,20 +260,96 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     pendantShape,
     letterSpacing = 0,
     textAlignment = 'center',
-    textCurve = 0,
     secondLineText = '',
+    secondLineFont = 'helvetiker_bold',
     secondLineSize = 16,
+    secondLineCurve = 0,
+    thirdLineText = '',
+    thirdLineFont = 'helvetiker_bold',
+    thirdLineSize = 14,
+    thirdLineCurve = 0,
     engrave = false,
     borderWidth = 0,
     customShapePoints = null,
     reliefData = null,
-    reliefHeight = 3
+    reliefHeight = 3,
+    customSTLGeometry = null
   } = params;
 
-  const hasText = text && text.trim().length > 0;
+  // Custom STL replaces the entire plate+text pendant
+  if (customSTLGeometry) {
+    const group = new THREE.Group();
+    group.name = 'pendant';
+
+    const material = createMaterial(materialOpts.key || 'gold', materialOpts);
+    const geo = customSTLGeometry.clone();
+    geo.computeBoundingBox();
+    geo.center();
+    geo.computeVertexNormals();
+
+    const box = geo.boundingBox;
+    const stlW = box.max.x - box.min.x;
+    const stlH = box.max.y - box.min.y;
+    const stlD = box.max.z - box.min.z;
+
+    const mesh = new THREE.Mesh(geo, material);
+    group.add(mesh);
+
+    const pendantTop = stlH / 2;
+
+    if (chainInfo) {
+      const { innerTopY, chainThickness } = chainInfo;
+      const bevelClear = 1.0;
+      const connGap = chainThickness * 0.3;
+      const pendantCenterY = innerTopY - pendantTop - connGap;
+      const stlMidZ = 0; // centered geometry
+
+      const connLocalBottom = pendantTop + bevelClear;
+      const connLocalTop = innerTopY - pendantCenterY;
+      const connHeight = connLocalTop - connLocalBottom;
+
+      if (connHeight > 0) {
+        const connWidth = chainThickness * 0.5;
+        const connDepth = stlD + 1;
+        const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
+        connGeo.translate(0, connLocalBottom + connHeight / 2, stlMidZ);
+        const connMesh = new THREE.Mesh(connGeo, material.clone());
+        group.add(connMesh);
+      }
+
+      return {
+        group,
+        width: stlW,
+        height: stlH,
+        pendantCenterY,
+        defaultZ: 0
+      };
+    }
+
+    return {
+      group,
+      width: stlW,
+      height: stlH,
+      pendantCenterY: 0,
+      defaultZ: 0
+    };
+  }
+
+  // Build lines array: each line has text, font key, size, curve
+  const lines = [];
+  if (text && text.trim().length > 0) {
+    lines.push({ text: text.trim(), fontKey, size: textSize, curve: textCurve });
+  }
+  if (secondLineText && secondLineText.trim().length > 0) {
+    lines.push({ text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve });
+  }
+  if (thirdLineText && thirdLineText.trim().length > 0) {
+    lines.push({ text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve });
+  }
+
+  const hasText = lines.length > 0;
   const hasImage = reliefData && reliefData.data;
 
-  // Need at least text or an image to render
   if (!hasText && !hasImage) return null;
 
   const group = new THREE.Group();
@@ -285,33 +362,39 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   let textGroup = null;
 
   if (hasText) {
-    const font = await loadFont(fontKey);
+    textGroup = new THREE.Group();
 
-    // Create primary text
-    const usePerChar = letterSpacing !== 0 || textCurve !== 0;
-    const textResult = usePerChar
-      ? createCharacterMeshes(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
-      : createSingleTextMesh(text.toUpperCase(), font, textSize, extrudeDepth, bevelEnabled, material.clone());
+    // Render each line and measure
+    const lineResults = [];
+    for (const line of lines) {
+      const font = await loadFont(line.fontKey);
+      const usePerChar = letterSpacing !== 0 || line.curve !== 0;
+      const result = usePerChar
+        ? createCharacterMeshes(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material)
+        : createSingleTextMesh(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, material.clone());
+      lineResults.push({ ...result, lineSize: line.size });
+    }
 
-    textGroup = textResult.group;
-    totalTextWidth = textResult.width;
-    totalTextHeight = textResult.height;
+    // Compute total dimensions and position each line
+    const lineGap = 0.3; // gap as fraction of preceding line size
+    let totalH = 0;
+    for (let i = 0; i < lineResults.length; i++) {
+      const lr = lineResults[i];
+      totalTextWidth = Math.max(totalTextWidth, lr.width);
+      totalH += lr.height;
+      if (i > 0) totalH += lineResults[i - 1].lineSize * lineGap;
+    }
+    totalTextHeight = totalH;
 
-    // Create second line if provided
-    if (secondLineText && secondLineText.trim().length > 0) {
-      const sl = usePerChar
-        ? createCharacterMeshes(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material)
-        : createSingleTextMesh(secondLineText.toUpperCase(), font, secondLineSize, extrudeDepth, bevelEnabled, material.clone());
-
-      const gap = textSize * 0.3;
-      const secondBlockHeight = gap + sl.height;
-      sl.group.position.y = -(totalTextHeight / 2 + gap + sl.height / 2);
-      textGroup.add(sl.group);
-
-      totalTextWidth = Math.max(totalTextWidth, sl.width);
-      totalTextHeight += secondBlockHeight;
-
-      textGroup.position.y = secondBlockHeight / 2;
+    // Position lines top-to-bottom, centered vertically
+    let cursorY = totalTextHeight / 2;
+    for (let i = 0; i < lineResults.length; i++) {
+      const lr = lineResults[i];
+      if (i > 0) cursorY -= lineResults[i - 1].lineSize * lineGap;
+      cursorY -= lr.height / 2;
+      lr.group.position.y = cursorY;
+      cursorY -= lr.height / 2;
+      textGroup.add(lr.group);
     }
 
     // Position text on plate surface
