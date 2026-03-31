@@ -294,10 +294,25 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     geo.center();
     geo.computeVertexNormals();
 
+    // Auto-resize: scale STL so largest dimension fits target pendant size
+    const rawBox = geo.boundingBox;
+    const rawW = rawBox.max.x - rawBox.min.x;
+    const rawH = rawBox.max.y - rawBox.min.y;
+    const rawD = rawBox.max.z - rawBox.min.z;
+    const targetSize = 50; // target max dimension in mm (pendant-sized)
+    const maxDim = Math.max(rawW, rawH, rawD);
+    const scaleFactor = maxDim > 0 ? targetSize / maxDim : 1;
+    geo.scale(scaleFactor, scaleFactor, scaleFactor);
+
+    // Recompute bounds after scaling
+    geo.computeBoundingBox();
     const box = geo.boundingBox;
     const stlW = box.max.x - box.min.x;
     const stlH = box.max.y - box.min.y;
     const stlD = box.max.z - box.min.z;
+
+    // Align to chain plane: center Z like the plate does
+    const stlMidZ = (box.max.z + box.min.z) / 2;
 
     const mesh = new THREE.Mesh(geo, material);
     group.add(mesh);
@@ -309,7 +324,6 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const bevelClear = 1.0;
       const connGap = chainThickness * 0.3;
       const pendantCenterY = innerTopY - pendantTop - connGap;
-      const stlMidZ = 0; // centered geometry
 
       const connLocalBottom = pendantTop + bevelClear;
       const connLocalTop = innerTopY - pendantCenterY;
@@ -329,7 +343,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         width: stlW,
         height: stlH,
         pendantCenterY,
-        defaultZ: 0
+        defaultZ: -stlMidZ
       };
     }
 
@@ -338,7 +352,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       width: stlW,
       height: stlH,
       pendantCenterY: 0,
-      defaultZ: 0
+      defaultZ: -stlMidZ
     };
   }
 
