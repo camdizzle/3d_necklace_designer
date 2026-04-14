@@ -319,6 +319,25 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     geo.center();
     geo.computeVertexNormals();
 
+    // Auto-orient: a pendant is flat with its face along XY and thickness along Z.
+    // Detect which axis has the smallest extent and rotate that axis onto Z so
+    // the pendant faces the camera / aligns with the chain plane.
+    const orientBox = geo.boundingBox;
+    const extentX = orientBox.max.x - orientBox.min.x;
+    const extentY = orientBox.max.y - orientBox.min.y;
+    const extentZ = orientBox.max.z - orientBox.min.z;
+    const minExtent = Math.min(extentX, extentY, extentZ);
+    if (minExtent === extentX) {
+      // X is thinnest — rotate around Y to move X onto Z
+      geo.rotateY(Math.PI / 2);
+    } else if (minExtent === extentY) {
+      // Y is thinnest — rotate around X to move Y onto Z
+      geo.rotateX(Math.PI / 2);
+    }
+    // If Z is already thinnest, no rotation needed.
+    geo.computeBoundingBox();
+    geo.center();
+
     // Auto-resize: scale STL so largest dimension fits target pendant size
     const rawBox = geo.boundingBox;
     const rawW = rawBox.max.x - rawBox.min.x;
