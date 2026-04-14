@@ -1,9 +1,34 @@
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import { FONTS, MATERIALS } from './constants.js';
+import { FONTS, MATERIALS, SCRIPT_FONTS } from './constants.js';
 
 const fontCache = {};
+
+// Script fonts render better in original case (lowercase letters connect)
+// and need finer curves + smaller bevels because of thin delicate strokes.
+function isScriptFont(fontKey) {
+  return SCRIPT_FONTS.includes(fontKey);
+}
+
+function getTextRenderOpts(fontKey) {
+  if (isScriptFont(fontKey)) {
+    return {
+      curveSegments: 12,
+      bevelThickness: 0.4,
+      bevelSize: 0.25,
+      bevelSegments: 2,
+      preserveCase: true
+    };
+  }
+  return {
+    curveSegments: 6,
+    bevelThickness: 1.5,
+    bevelSize: 1,
+    bevelSegments: 3,
+    preserveCase: false
+  };
+}
 
 function loadFont(fontKey) {
   if (fontCache[fontKey]) return Promise.resolve(fontCache[fontKey]);
@@ -125,7 +150,7 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
 /**
  * Create text as individual character meshes for letter spacing and curve support.
  */
-function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material) {
+function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material, renderOpts) {
   const group = new THREE.Group();
   const chars = [];
   let totalWidth = 0;
@@ -143,11 +168,11 @@ function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled,
       font,
       size: textSize,
       depth: extrudeDepth,
-      curveSegments: 6,
+      curveSegments: renderOpts.curveSegments,
       bevelEnabled,
-      bevelThickness: bevelEnabled ? 1.5 : 0,
-      bevelSize: bevelEnabled ? 1 : 0,
-      bevelSegments: bevelEnabled ? 3 : 0
+      bevelThickness: bevelEnabled ? renderOpts.bevelThickness : 0,
+      bevelSize: bevelEnabled ? renderOpts.bevelSize : 0,
+      bevelSegments: bevelEnabled ? renderOpts.bevelSegments : 0
     });
     geo.computeBoundingBox();
     const bb = geo.boundingBox;
@@ -201,16 +226,16 @@ function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled,
 /**
  * Create a single text mesh (no letter spacing / curve).
  */
-function createSingleTextMesh(text, font, textSize, extrudeDepth, bevelEnabled, material) {
+function createSingleTextMesh(text, font, textSize, extrudeDepth, bevelEnabled, material, renderOpts) {
   const geo = new TextGeometry(text, {
     font,
     size: textSize,
     depth: extrudeDepth,
-    curveSegments: 6,
+    curveSegments: renderOpts.curveSegments,
     bevelEnabled,
-    bevelThickness: bevelEnabled ? 1.5 : 0,
-    bevelSize: bevelEnabled ? 1 : 0,
-    bevelSegments: bevelEnabled ? 3 : 0
+    bevelThickness: bevelEnabled ? renderOpts.bevelThickness : 0,
+    bevelSize: bevelEnabled ? renderOpts.bevelSize : 0,
+    bevelSegments: bevelEnabled ? renderOpts.bevelSegments : 0
   });
 
   geo.computeBoundingBox();
@@ -294,10 +319,25 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     geo.center();
     geo.computeVertexNormals();
 
+    // Auto-resize: scale STL so largest dimension fits target pendant size
+    const rawBox = geo.boundingBox;
+    const rawW = rawBox.max.x - rawBox.min.x;
+    const rawH = rawBox.max.y - rawBox.min.y;
+    const rawD = rawBox.max.z - rawBox.min.z;
+    const targetSize = 50; // target max dimension in mm (pendant-sized)
+    const maxDim = Math.max(rawW, rawH, rawD);
+    const scaleFactor = maxDim > 0 ? targetSize / maxDim : 1;
+    geo.scale(scaleFactor, scaleFactor, scaleFactor);
+
+    // Recompute bounds after scaling
+    geo.computeBoundingBox();
     const box = geo.boundingBox;
     const stlW = box.max.x - box.min.x;
     const stlH = box.max.y - box.min.y;
     const stlD = box.max.z - box.min.z;
+
+    // Align to chain plane: center Z like the plate does
+    const stlMidZ = (box.max.z + box.min.z) / 2;
 
     const mesh = new THREE.Mesh(geo, material);
     group.add(mesh);
@@ -309,7 +349,6 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const bevelClear = 1.0;
       const connGap = chainThickness * 0.3;
       const pendantCenterY = innerTopY - pendantTop - connGap;
-      const stlMidZ = 0; // centered geometry
 
       const connLocalBottom = pendantTop + bevelClear;
       const connLocalTop = innerTopY - pendantCenterY;
@@ -329,7 +368,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         width: stlW,
         height: stlH,
         pendantCenterY,
-        defaultZ: 0
+        defaultZ: -stlMidZ
       };
     }
 
@@ -338,7 +377,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       width: stlW,
       height: stlH,
       pendantCenterY: 0,
-      defaultZ: 0
+      defaultZ: -stlMidZ
     };
   }
 
@@ -375,10 +414,12 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const lineResults = [];
     for (const line of lines) {
       const font = await loadFont(line.fontKey);
+      const renderOpts = getTextRenderOpts(line.fontKey);
+      const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
       const usePerChar = letterSpacing !== 0 || line.curve !== 0;
       const result = usePerChar
-        ? createCharacterMeshes(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material)
-        : createSingleTextMesh(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, material.clone());
+        ? createCharacterMeshes(displayText, font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material, renderOpts)
+        : createSingleTextMesh(displayText, font, line.size, extrudeDepth, bevelEnabled, material.clone(), renderOpts);
       lineResults.push({ ...result, lineSize: line.size, offsetX: line.offsetX, offsetY: line.offsetY });
     }
 

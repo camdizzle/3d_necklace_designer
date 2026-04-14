@@ -38,8 +38,25 @@ export const FONTS = {
   droid_serif_regular: '/fonts/droid_serif_regular.typeface.json',
   dancing_script: '/fonts/dancing_script.typeface.json',
   pacifico: '/fonts/pacifico.typeface.json',
-  great_vibes: '/fonts/great_vibes.typeface.json'
+  great_vibes: '/fonts/great_vibes.typeface.json',
+  allura: '/fonts/allura.typeface.json',
+  sacramento: '/fonts/sacramento.typeface.json',
+  tangerine: '/fonts/tangerine.typeface.json',
+  alex_brush: '/fonts/alex_brush.typeface.json',
+  kaushan_script: '/fonts/kaushan_script.typeface.json'
 };
+
+// Script/cursive fonts — rendered with preserved case, finer curves, smaller bevels
+export const SCRIPT_FONTS = [
+  'dancing_script',
+  'pacifico',
+  'great_vibes',
+  'allura',
+  'sacramento',
+  'tangerine',
+  'alex_brush',
+  'kaushan_script'
+];
 
 export const FONT_LABELS = {
   helvetiker_bold: 'Helvetiker Bold',
@@ -54,7 +71,12 @@ export const FONT_LABELS = {
   droid_serif_regular: 'Droid Serif',
   dancing_script: 'Dancing Script ✦',
   pacifico: 'Pacifico ✦',
-  great_vibes: 'Great Vibes ✦'
+  great_vibes: 'Great Vibes ✦',
+  allura: 'Allura ✦',
+  sacramento: 'Sacramento ✦',
+  tangerine: 'Tangerine ✦',
+  alex_brush: 'Alex Brush ✦',
+  kaushan_script: 'Kaushan Script ✦'
 };
 
 export const DEFAULTS = {
