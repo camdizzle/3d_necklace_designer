@@ -1,9 +1,34 @@
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import { FONTS, MATERIALS } from './constants.js';
+import { FONTS, MATERIALS, SCRIPT_FONTS } from './constants.js';
 
 const fontCache = {};
+
+// Script fonts render better in original case (lowercase letters connect)
+// and need finer curves + smaller bevels because of thin delicate strokes.
+function isScriptFont(fontKey) {
+  return SCRIPT_FONTS.includes(fontKey);
+}
+
+function getTextRenderOpts(fontKey) {
+  if (isScriptFont(fontKey)) {
+    return {
+      curveSegments: 12,
+      bevelThickness: 0.4,
+      bevelSize: 0.25,
+      bevelSegments: 2,
+      preserveCase: true
+    };
+  }
+  return {
+    curveSegments: 6,
+    bevelThickness: 1.5,
+    bevelSize: 1,
+    bevelSegments: 3,
+    preserveCase: false
+  };
+}
 
 function loadFont(fontKey) {
   if (fontCache[fontKey]) return Promise.resolve(fontCache[fontKey]);
@@ -125,7 +150,7 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
 /**
  * Create text as individual character meshes for letter spacing and curve support.
  */
-function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material) {
+function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled, letterSpacing, textCurve, material, renderOpts) {
   const group = new THREE.Group();
   const chars = [];
   let totalWidth = 0;
@@ -143,11 +168,11 @@ function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled,
       font,
       size: textSize,
       depth: extrudeDepth,
-      curveSegments: 6,
+      curveSegments: renderOpts.curveSegments,
       bevelEnabled,
-      bevelThickness: bevelEnabled ? 1.5 : 0,
-      bevelSize: bevelEnabled ? 1 : 0,
-      bevelSegments: bevelEnabled ? 3 : 0
+      bevelThickness: bevelEnabled ? renderOpts.bevelThickness : 0,
+      bevelSize: bevelEnabled ? renderOpts.bevelSize : 0,
+      bevelSegments: bevelEnabled ? renderOpts.bevelSegments : 0
     });
     geo.computeBoundingBox();
     const bb = geo.boundingBox;
@@ -201,16 +226,16 @@ function createCharacterMeshes(text, font, textSize, extrudeDepth, bevelEnabled,
 /**
  * Create a single text mesh (no letter spacing / curve).
  */
-function createSingleTextMesh(text, font, textSize, extrudeDepth, bevelEnabled, material) {
+function createSingleTextMesh(text, font, textSize, extrudeDepth, bevelEnabled, material, renderOpts) {
   const geo = new TextGeometry(text, {
     font,
     size: textSize,
     depth: extrudeDepth,
-    curveSegments: 6,
+    curveSegments: renderOpts.curveSegments,
     bevelEnabled,
-    bevelThickness: bevelEnabled ? 1.5 : 0,
-    bevelSize: bevelEnabled ? 1 : 0,
-    bevelSegments: bevelEnabled ? 3 : 0
+    bevelThickness: bevelEnabled ? renderOpts.bevelThickness : 0,
+    bevelSize: bevelEnabled ? renderOpts.bevelSize : 0,
+    bevelSegments: bevelEnabled ? renderOpts.bevelSegments : 0
   });
 
   geo.computeBoundingBox();
@@ -389,10 +414,12 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const lineResults = [];
     for (const line of lines) {
       const font = await loadFont(line.fontKey);
+      const renderOpts = getTextRenderOpts(line.fontKey);
+      const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
       const usePerChar = letterSpacing !== 0 || line.curve !== 0;
       const result = usePerChar
-        ? createCharacterMeshes(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material)
-        : createSingleTextMesh(line.text.toUpperCase(), font, line.size, extrudeDepth, bevelEnabled, material.clone());
+        ? createCharacterMeshes(displayText, font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material, renderOpts)
+        : createSingleTextMesh(displayText, font, line.size, extrudeDepth, bevelEnabled, material.clone(), renderOpts);
       lineResults.push({ ...result, lineSize: line.size, offsetX: line.offsetX, offsetY: line.offsetY });
     }
 
