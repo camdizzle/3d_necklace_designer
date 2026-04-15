@@ -101,6 +101,7 @@ export function initUI(onChange) {
   bindSlider('letter-spacing', 'letterSpacing', parseFloat);
   bindSlider('extrude-depth', 'extrudeDepth', parseFloat);
   bindCheckbox('bevel-toggle', 'bevelEnabled');
+  bindCheckbox('align-to-plate-toggle', 'alignToPlate');
 
   // --- Line 2 ---
   bindTextInput('second-line-input', 'secondLineText');
@@ -112,6 +113,7 @@ export function initUI(onChange) {
   bindSlider('second-line-letter-spacing', 'secondLineLetterSpacing', parseFloat);
   bindSlider('second-line-extrude-depth', 'secondLineExtrudeDepth', parseFloat);
   bindCheckbox('second-line-bevel-toggle', 'secondLineBevelEnabled');
+  bindCheckbox('second-line-align-to-plate-toggle', 'secondLineAlignToPlate');
 
   // --- Line 3 ---
   bindTextInput('third-line-input', 'thirdLineText');
@@ -123,6 +125,7 @@ export function initUI(onChange) {
   bindSlider('third-line-letter-spacing', 'thirdLineLetterSpacing', parseFloat);
   bindSlider('third-line-extrude-depth', 'thirdLineExtrudeDepth', parseFloat);
   bindCheckbox('third-line-bevel-toggle', 'thirdLineBevelEnabled');
+  bindCheckbox('third-line-align-to-plate-toggle', 'thirdLineAlignToPlate');
 
   // --- Shared text layout ---
   bindSlider('line-spacing', 'lineSpacing', parseFloat);
@@ -251,6 +254,9 @@ export function initUI(onChange) {
     'bevel-toggle': 'bevelEnabled',
     'second-line-bevel-toggle': 'secondLineBevelEnabled',
     'third-line-bevel-toggle': 'thirdLineBevelEnabled',
+    'align-to-plate-toggle': 'alignToPlate',
+    'second-line-align-to-plate-toggle': 'secondLineAlignToPlate',
+    'third-line-align-to-plate-toggle': 'thirdLineAlignToPlate',
     'engrave-toggle': 'engrave',
     'matte-toggle': 'matteFinish',
     'two-tone-toggle': 'twoTone',

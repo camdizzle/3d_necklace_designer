@@ -90,6 +90,7 @@ export const DEFAULTS = {
   letterSpacing: 0,
   extrudeDepth: 8,
   bevelEnabled: true,
+  alignToPlate: false,
 
   // Line 2
   secondLineText: '',
@@ -101,6 +102,7 @@ export const DEFAULTS = {
   secondLineLetterSpacing: 0,
   secondLineExtrudeDepth: 8,
   secondLineBevelEnabled: true,
+  secondLineAlignToPlate: false,
 
   // Line 3
   thirdLineText: '',
@@ -112,6 +114,7 @@ export const DEFAULTS = {
   thirdLineLetterSpacing: 0,
   thirdLineExtrudeDepth: 8,
   thirdLineBevelEnabled: true,
+  thirdLineAlignToPlate: false,
 
   // Shared text settings
   lineSpacing: 1.0,
