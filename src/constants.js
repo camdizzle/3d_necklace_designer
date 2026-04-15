@@ -26,24 +26,24 @@ export const MATERIALS = {
 };
 
 export const FONTS = {
-  helvetiker_bold: '/fonts/helvetiker_bold.typeface.json',
-  helvetiker_regular: '/fonts/helvetiker_regular.typeface.json',
-  optimer_bold: '/fonts/optimer_bold.typeface.json',
-  optimer_regular: '/fonts/optimer_regular.typeface.json',
-  gentilis_bold: '/fonts/gentilis_bold.typeface.json',
-  gentilis_regular: '/fonts/gentilis_regular.typeface.json',
-  droid_sans_bold: '/fonts/droid_sans_bold.typeface.json',
-  droid_sans_regular: '/fonts/droid_sans_regular.typeface.json',
-  droid_serif_bold: '/fonts/droid_serif_bold.typeface.json',
-  droid_serif_regular: '/fonts/droid_serif_regular.typeface.json',
-  dancing_script: '/fonts/dancing_script.typeface.json',
-  pacifico: '/fonts/pacifico.typeface.json',
-  great_vibes: '/fonts/great_vibes.typeface.json',
-  allura: '/fonts/allura.typeface.json',
-  sacramento: '/fonts/sacramento.typeface.json',
-  tangerine: '/fonts/tangerine.typeface.json',
-  alex_brush: '/fonts/alex_brush.typeface.json',
-  kaushan_script: '/fonts/kaushan_script.typeface.json'
+  helvetiker_bold: 'public/fonts/helvetiker_bold.typeface.json',
+  helvetiker_regular: 'public/fonts/helvetiker_regular.typeface.json',
+  optimer_bold: 'public/fonts/optimer_bold.typeface.json',
+  optimer_regular: 'public/fonts/optimer_regular.typeface.json',
+  gentilis_bold: 'public/fonts/gentilis_bold.typeface.json',
+  gentilis_regular: 'public/fonts/gentilis_regular.typeface.json',
+  droid_sans_bold: 'public/fonts/droid_sans_bold.typeface.json',
+  droid_sans_regular: 'public/fonts/droid_sans_regular.typeface.json',
+  droid_serif_bold: 'public/fonts/droid_serif_bold.typeface.json',
+  droid_serif_regular: 'public/fonts/droid_serif_regular.typeface.json',
+  dancing_script: 'public/fonts/dancing_script.typeface.json',
+  pacifico: 'public/fonts/pacifico.typeface.json',
+  great_vibes: 'public/fonts/great_vibes.typeface.json',
+  allura: 'public/fonts/allura.typeface.json',
+  sacramento: 'public/fonts/sacramento.typeface.json',
+  tangerine: 'public/fonts/tangerine.typeface.json',
+  alex_brush: 'public/fonts/alex_brush.typeface.json',
+  kaushan_script: 'public/fonts/kaushan_script.typeface.json'
 };
 
 // Script/cursive fonts — rendered with preserved case, finer curves, smaller bevels

@@ -62,7 +62,7 @@ export function loadChain(materialKey = 'gold') {
     const loader = new STLLoader();
 
     loader.load(
-      '/chain_loop.stl',
+      'public/chain_loop.stl',
       (geometry) => {
         geometry.computeVertexNormals();
         geometry.center();
