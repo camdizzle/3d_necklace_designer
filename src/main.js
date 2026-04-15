@@ -7,6 +7,7 @@ import { exportByFormat, takeScreenshot, computeDimensions } from './exporter.js
 import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
 import { traceImageSilhouette, createHeightmapData } from './imageProcessor.js';
+import { initPremium, isPro, showUpgradeModal, FEATURES } from './premium.js';
 
 const viewport = document.getElementById('viewport');
 const loading = document.getElementById('loading');
@@ -274,16 +275,20 @@ const state = initUI(async (newState, changedKey) => {
   await rebuildPendant(newState);
 });
 
-// Export
+// Export (Pro-gated)
 exportBtn.addEventListener('click', () => {
+  if (!isPro()) {
+    showUpgradeModal(FEATURES.export);
+    return;
+  }
   const text = state.text || 'necklace';
   exportByFormat(scene, text, state.exportFormat || 'stl');
 });
 
-// Screenshot
+// Screenshot — free with watermark, Pro without.
 if (screenshotBtn) {
   screenshotBtn.addEventListener('click', () => {
-    takeScreenshot(renderer, scene, camera);
+    takeScreenshot(renderer, scene, camera, { watermark: !isPro() });
   });
 }
 
@@ -326,12 +331,17 @@ if (loadPresetBtn) {
   });
 }
 
-// SVG import
+// SVG import (Pro)
 const svgInput = document.getElementById('svg-import');
 if (svgInput) {
   svgInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!isPro()) {
+      svgInput.value = '';
+      showUpgradeModal(FEATURES.customSvg);
+      return;
+    }
 
     const text = await file.text();
     try {
@@ -388,12 +398,17 @@ if (svgInput) {
   });
 }
 
-// Image silhouette import
+// Image silhouette import (Pro)
 const imageSilhouetteInput = document.getElementById('image-silhouette-import');
 if (imageSilhouetteInput) {
   imageSilhouetteInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!isPro()) {
+      imageSilhouetteInput.value = '';
+      showUpgradeModal(FEATURES.imageSilhouette);
+      return;
+    }
     silhouetteImageFile = file;
     try {
       const threshold = state.imageThreshold || 128;
@@ -410,12 +425,17 @@ if (imageSilhouetteInput) {
   });
 }
 
-// Image relief / heightmap import
+// Image relief / heightmap import (Pro)
 const imageReliefInput = document.getElementById('image-relief-import');
 if (imageReliefInput) {
   imageReliefInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!isPro()) {
+      imageReliefInput.value = '';
+      showUpgradeModal(FEATURES.imageRelief);
+      return;
+    }
     reliefImageFile = file;
     try {
       const heightmap = await createHeightmapData(file, {
@@ -431,12 +451,17 @@ if (imageReliefInput) {
   });
 }
 
-// STL pendant import
+// STL pendant import (Pro)
 const stlImportInput = document.getElementById('stl-import');
 if (stlImportInput) {
   stlImportInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!isPro()) {
+      stlImportInput.value = '';
+      showUpgradeModal(FEATURES.stlImport);
+      return;
+    }
     try {
       const buffer = await file.arrayBuffer();
       const loader = new STLLoader();
@@ -451,4 +476,7 @@ if (stlImportInput) {
   });
 }
 
-init();
+(async () => {
+  await initPremium();
+  init();
+})();
