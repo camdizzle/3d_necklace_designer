@@ -279,14 +279,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     textCurve = 0,
     textOffsetX = 0,
     textOffsetY = 0,
-    extrudeDepth,
-    bevelEnabled,
+    letterSpacing = 0,
+    extrudeDepth = 8,
+    bevelEnabled = true,
     platePadding,
     plateRadius,
     plateThickness,
     pendantShape,
     lineSpacing = 1.0,
-    letterSpacing = 0,
     textAlignment = 'center',
     secondLineText = '',
     secondLineFont = 'helvetiker_bold',
@@ -294,12 +294,18 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     secondLineCurve = 0,
     secondLineOffsetX = 0,
     secondLineOffsetY = 0,
+    secondLineLetterSpacing = 0,
+    secondLineExtrudeDepth = 8,
+    secondLineBevelEnabled = true,
     thirdLineText = '',
     thirdLineFont = 'helvetiker_bold',
     thirdLineSize = 14,
     thirdLineCurve = 0,
     thirdLineOffsetX = 0,
     thirdLineOffsetY = 0,
+    thirdLineLetterSpacing = 0,
+    thirdLineExtrudeDepth = 8,
+    thirdLineBevelEnabled = true,
     engrave = false,
     borderWidth = 0,
     customShapePoints = null,
@@ -318,6 +324,25 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     geo.computeBoundingBox();
     geo.center();
     geo.computeVertexNormals();
+
+    // Auto-orient: a pendant is flat with its face along XY and thickness along Z.
+    // Detect which axis has the smallest extent and rotate that axis onto Z so
+    // the pendant faces the camera / aligns with the chain plane.
+    const orientBox = geo.boundingBox;
+    const extentX = orientBox.max.x - orientBox.min.x;
+    const extentY = orientBox.max.y - orientBox.min.y;
+    const extentZ = orientBox.max.z - orientBox.min.z;
+    const minExtent = Math.min(extentX, extentY, extentZ);
+    if (minExtent === extentX) {
+      // X is thinnest — rotate around Y to move X onto Z
+      geo.rotateY(Math.PI / 2);
+    } else if (minExtent === extentY) {
+      // Y is thinnest — rotate around X to move Y onto Z
+      geo.rotateX(Math.PI / 2);
+    }
+    // If Z is already thinnest, no rotation needed.
+    geo.computeBoundingBox();
+    geo.center();
 
     // Auto-resize: scale STL so largest dimension fits target pendant size
     const rawBox = geo.boundingBox;
@@ -384,13 +409,25 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   // Build lines array: each line has text, font key, size, curve, offsets
   const lines = [];
   if (text && text.trim().length > 0) {
-    lines.push({ text: text.trim(), fontKey, size: textSize, curve: textCurve, offsetX: textOffsetX, offsetY: textOffsetY });
+    lines.push({
+      text: text.trim(), fontKey, size: textSize, curve: textCurve,
+      offsetX: textOffsetX, offsetY: textOffsetY,
+      letterSpacing, extrudeDepth, bevelEnabled
+    });
   }
   if (secondLineText && secondLineText.trim().length > 0) {
-    lines.push({ text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve, offsetX: secondLineOffsetX, offsetY: secondLineOffsetY });
+    lines.push({
+      text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve,
+      offsetX: secondLineOffsetX, offsetY: secondLineOffsetY,
+      letterSpacing: secondLineLetterSpacing, extrudeDepth: secondLineExtrudeDepth, bevelEnabled: secondLineBevelEnabled
+    });
   }
   if (thirdLineText && thirdLineText.trim().length > 0) {
-    lines.push({ text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve, offsetX: thirdLineOffsetX, offsetY: thirdLineOffsetY });
+    lines.push({
+      text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve,
+      offsetX: thirdLineOffsetX, offsetY: thirdLineOffsetY,
+      letterSpacing: thirdLineLetterSpacing, extrudeDepth: thirdLineExtrudeDepth, bevelEnabled: thirdLineBevelEnabled
+    });
   }
 
   const hasText = lines.length > 0;
@@ -416,10 +453,10 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const font = await loadFont(line.fontKey);
       const renderOpts = getTextRenderOpts(line.fontKey);
       const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
-      const usePerChar = letterSpacing !== 0 || line.curve !== 0;
+      const usePerChar = line.letterSpacing !== 0 || line.curve !== 0;
       const result = usePerChar
-        ? createCharacterMeshes(displayText, font, line.size, extrudeDepth, bevelEnabled, letterSpacing, line.curve, material, renderOpts)
-        : createSingleTextMesh(displayText, font, line.size, extrudeDepth, bevelEnabled, material.clone(), renderOpts);
+        ? createCharacterMeshes(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, line.letterSpacing, line.curve, material, renderOpts)
+        : createSingleTextMesh(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, material.clone(), renderOpts);
       lineResults.push({ ...result, lineSize: line.size, offsetX: line.offsetX, offsetY: line.offsetY });
     }
 
@@ -448,18 +485,27 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       textGroup.add(lr.group);
     }
 
-    // Position text on plate surface
+    // Position each line on the plate surface, accounting for its own extrude depth.
+    // This lets each line have a different depth without the whole group riding on
+    // a single Z offset (which would recess short-depth lines too far).
     const plateFrontZ = plateThickness - 0.5;
+    for (let i = 0; i < lineResults.length; i++) {
+      const lr = lineResults[i];
+      const lineDepth = lines[i].extrudeDepth;
+      if (engrave) {
+        // Recess line so its front face is 0.3 above the plate surface.
+        lr.group.position.z = plateFrontZ + 0.3 - lineDepth;
+      } else {
+        lr.group.position.z = plateFrontZ;
+      }
+    }
     if (engrave) {
-      textGroup.position.z = plateFrontZ - extrudeDepth + 0.3;
       textGroup.traverse((child) => {
         if (child.isMesh) {
           child.material = child.material.clone();
           child.material.color.multiplyScalar(0.6);
         }
       });
-    } else {
-      textGroup.position.z = plateFrontZ;
     }
   }
 
