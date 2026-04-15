@@ -55,7 +55,8 @@ async function init() {
     chainInfo = {
       innerTopY: chain.innerTopY,
       innerBottomY: chain.innerBottomY,
-      chainThickness: chain.chainThickness
+      chainThickness: chain.chainThickness,
+      attachX: chain.attachX
     };
     scene.add(chainMesh);
 
@@ -108,7 +109,8 @@ async function rebuildPendant(state) {
   const scaledChainInfo = chainInfo ? {
     innerTopY: chainInfo.innerTopY * scale,
     innerBottomY: chainInfo.innerBottomY * scale,
-    chainThickness: chainInfo.chainThickness * scale
+    chainThickness: chainInfo.chainThickness * scale,
+    attachX: chainInfo.attachX * scale
   } : null;
 
   const result = await generatePendant({
@@ -164,8 +166,9 @@ async function rebuildPendant(state) {
   pendantGroup.scale.setScalar(ps);
 
   const baseZ = result.defaultZ || 0;
+  const baseX = scaledChainInfo ? scaledChainInfo.attachX : 0;
   pendantGroup.position.set(
-    state.pendantOffsetX,
+    baseX + state.pendantOffsetX,
     result.pendantCenterY + state.pendantOffsetY,
     baseZ + state.pendantOffsetZ
   );

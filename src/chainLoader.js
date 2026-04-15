@@ -67,13 +67,16 @@ export function loadChain(materialKey = 'gold') {
         geometry.computeVertexNormals();
         geometry.center();
 
-        let attach = findChainAttachPoint(geometry);
+        const initialAttach = findChainAttachPoint(geometry);
+        let attach = initialAttach;
 
-        // If the detected attach point is off-center in X, translate the
-        // geometry so the attachment area lands on X=0. The pendant hangs
-        // from X=0, so this keeps it visually aligned with the chain opening.
-        if (Math.abs(attach.attachX) > 0.01) {
-          geometry.translate(-attach.attachX, 0, 0);
+        // Split the difference: if the detected attach point is off-center,
+        // shift the chain geometry halfway so the visual center doesn't swing
+        // too far. The remaining attachX is returned so the caller can place
+        // the pendant (and its connector) at that X, keeping the connector
+        // aligned with the chain's inner-loop top regardless of STL asymmetry.
+        if (Math.abs(initialAttach.attachX) > 0.01) {
+          geometry.translate(-initialAttach.attachX / 2, 0, 0);
           attach = findChainAttachPoint(geometry);
         }
 
@@ -95,6 +98,7 @@ export function loadChain(materialKey = 'gold') {
           geometry,
           size,
           attachPoint: attach.attachPoint,
+          attachX: attach.attachX,
           innerTopY: attach.innerTopY,
           innerBottomY: attach.innerBottomY,
           chainThickness: size.z
