@@ -32,10 +32,28 @@ function findChainAttachPoint(geometry) {
     }
   }
 
+  // Find the actual X center of the attachment region. geometry.center() only
+  // centers the bounding box — if the chain STL has any asymmetry (clasp,
+  // uneven link pattern), the pendant would hang from X=0 while the chain's
+  // inner loop top sits slightly off-center, making the pendant look offset.
+  // We sample vertices near innerTopY and take their mean X as the true
+  // attachment center so the caller can translate the chain to match.
+  const yTolerance = Math.max(2, maxGap * 0.05);
+  let xSum = 0, xCount = 0;
+  for (let i = 0; i < count; i++) {
+    const y = pos.getY(i);
+    if (Math.abs(y - gapEnd) < yTolerance) {
+      xSum += pos.getX(i);
+      xCount++;
+    }
+  }
+  const attachX = xCount > 0 ? xSum / xCount : 0;
+
   return {
-    attachPoint: new THREE.Vector3(0, gapEnd, 0),
+    attachPoint: new THREE.Vector3(attachX, gapEnd, 0),
     innerTopY: gapEnd,
-    innerBottomY: gapStart
+    innerBottomY: gapStart,
+    attachX
   };
 }
 
@@ -49,7 +67,15 @@ export function loadChain(materialKey = 'gold') {
         geometry.computeVertexNormals();
         geometry.center();
 
-        const attach = findChainAttachPoint(geometry);
+        let attach = findChainAttachPoint(geometry);
+
+        // If the detected attach point is off-center in X, translate the
+        // geometry so the attachment area lands on X=0. The pendant hangs
+        // from X=0, so this keeps it visually aligned with the chain opening.
+        if (Math.abs(attach.attachX) > 0.01) {
+          geometry.translate(-attach.attachX, 0, 0);
+          attach = findChainAttachPoint(geometry);
+        }
 
         const mat = MATERIALS[materialKey];
         const material = new THREE.MeshStandardMaterial({
