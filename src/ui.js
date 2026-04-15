@@ -137,6 +137,9 @@ export function initUI(onChange) {
   bindSlider('plate-radius', 'plateRadius', parseInt);
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
   bindSlider('border-width', 'borderWidth', parseFloat);
+  bindCheckbox('lock-plate-size-toggle', 'lockPlateSize');
+  bindSlider('plate-width', 'plateWidth', parseFloat);
+  bindSlider('plate-height', 'plateHeight', parseFloat);
 
   // --- Shape ---
   const shapeSelect = document.getElementById('shape-select');
@@ -240,6 +243,8 @@ export function initUI(onChange) {
     'plate-radius': 'plateRadius',
     'plate-thickness': 'plateThickness',
     'border-width': 'borderWidth',
+    'plate-width': 'plateWidth',
+    'plate-height': 'plateHeight',
     'pendant-scale': 'pendantScale',
     'pendant-offset-x': 'pendantOffsetX',
     'pendant-offset-y': 'pendantOffsetY',
@@ -258,6 +263,7 @@ export function initUI(onChange) {
     'second-line-align-to-plate-toggle': 'secondLineAlignToPlate',
     'third-line-align-to-plate-toggle': 'thirdLineAlignToPlate',
     'engrave-toggle': 'engrave',
+    'lock-plate-size-toggle': 'lockPlateSize',
     'matte-toggle': 'matteFinish',
     'two-tone-toggle': 'twoTone',
     'hide-chain-toggle': 'hideChain',

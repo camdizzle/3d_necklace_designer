@@ -290,6 +290,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     plateRadius,
     plateThickness,
     pendantShape,
+    lockPlateSize = false,
+    plateWidth: lockedPlateWidth = 80,
+    plateHeight: lockedPlateHeight = 60,
     lineSpacing = 1.0,
     textAlignment = 'center',
     secondLineText = '',
@@ -490,12 +493,13 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     }
   }
 
-  // Plate sizing: use text bounds if available, otherwise default size for image-only
+  // Plate sizing: when locked, use explicit width/height regardless of content.
+  // Otherwise derive from text bounds (or a default for image-only pendants).
   const defaultImageSize = 60;
   const contentW = hasText ? totalTextWidth : defaultImageSize;
   const contentH = hasText ? totalTextHeight : defaultImageSize;
-  const rawW = contentW + platePadding * 2;
-  const rawH = contentH + platePadding * 2;
+  const rawW = lockPlateSize ? lockedPlateWidth : contentW + platePadding * 2;
+  const rawH = lockPlateSize ? lockedPlateHeight : contentH + platePadding * 2;
   const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
     pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
   );
