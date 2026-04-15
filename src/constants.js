@@ -87,6 +87,9 @@ export const DEFAULTS = {
   textCurve: 0,
   textOffsetX: 0,
   textOffsetY: 0,
+  letterSpacing: 0,
+  extrudeDepth: 8,
+  bevelEnabled: true,
 
   // Line 2
   secondLineText: '',
@@ -95,6 +98,9 @@ export const DEFAULTS = {
   secondLineCurve: 0,
   secondLineOffsetX: 0,
   secondLineOffsetY: 0,
+  secondLineLetterSpacing: 0,
+  secondLineExtrudeDepth: 8,
+  secondLineBevelEnabled: true,
 
   // Line 3
   thirdLineText: '',
@@ -103,13 +109,13 @@ export const DEFAULTS = {
   thirdLineCurve: 0,
   thirdLineOffsetX: 0,
   thirdLineOffsetY: 0,
+  thirdLineLetterSpacing: 0,
+  thirdLineExtrudeDepth: 8,
+  thirdLineBevelEnabled: true,
 
   // Shared text settings
   lineSpacing: 1.0,
-  letterSpacing: 0,
   textAlignment: 'center',
-  extrudeDepth: 8,
-  bevelEnabled: true,
   bevelThickness: 1.5,
   bevelSize: 1,
   bevelSegments: 3,

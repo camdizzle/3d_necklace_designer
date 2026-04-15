@@ -3,6 +3,42 @@ import { DEFAULTS } from './constants.js';
 export function initUI(onChange) {
   const state = { ...DEFAULTS };
 
+  // --- Collapsible sections ---
+  // Auto-wrap each .section's non-title children in a .section-body and wire up
+  // click-to-collapse on the section title. Persists state to localStorage.
+  const COLLAPSE_KEY = 'necklace_section_collapse';
+  let collapseState = {};
+  try {
+    collapseState = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}');
+  } catch {}
+  const saveCollapseState = () => {
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapseState)); } catch {}
+  };
+
+  document.querySelectorAll('#panel .section').forEach((section) => {
+    const title = section.querySelector('.section-title');
+    if (!title) return;
+    // Wrap everything after the title in a .section-body div
+    const body = document.createElement('div');
+    body.className = 'section-body';
+    let node = title.nextSibling;
+    while (node) {
+      const next = node.nextSibling;
+      body.appendChild(node);
+      node = next;
+    }
+    section.appendChild(body);
+
+    const sectionId = title.textContent.trim();
+    if (collapseState[sectionId]) section.classList.add('collapsed');
+
+    title.addEventListener('click', () => {
+      section.classList.toggle('collapsed');
+      collapseState[sectionId] = section.classList.contains('collapsed');
+      saveCollapseState();
+    });
+  });
+
   // --- Helpers ---
   function bindSlider(id, key, transform = parseFloat) {
     const slider = document.getElementById(id);
@@ -58,33 +94,39 @@ export function initUI(onChange) {
     }, 300);
   });
   bindSelect('font-select', 'font');
-  bindSlider('text-size', 'textSize', parseInt);
+  bindSlider('text-size', 'textSize', parseFloat);
   bindSlider('text-curve', 'textCurve', parseFloat);
   bindSlider('text-offset-x', 'textOffsetX', parseFloat);
   bindSlider('text-offset-y', 'textOffsetY', parseFloat);
+  bindSlider('letter-spacing', 'letterSpacing', parseFloat);
+  bindSlider('extrude-depth', 'extrudeDepth', parseFloat);
+  bindCheckbox('bevel-toggle', 'bevelEnabled');
 
   // --- Line 2 ---
   bindTextInput('second-line-input', 'secondLineText');
   bindSelect('second-line-font', 'secondLineFont');
-  bindSlider('second-line-size', 'secondLineSize', parseInt);
+  bindSlider('second-line-size', 'secondLineSize', parseFloat);
   bindSlider('second-line-curve', 'secondLineCurve', parseFloat);
   bindSlider('second-line-offset-x', 'secondLineOffsetX', parseFloat);
   bindSlider('second-line-offset-y', 'secondLineOffsetY', parseFloat);
+  bindSlider('second-line-letter-spacing', 'secondLineLetterSpacing', parseFloat);
+  bindSlider('second-line-extrude-depth', 'secondLineExtrudeDepth', parseFloat);
+  bindCheckbox('second-line-bevel-toggle', 'secondLineBevelEnabled');
 
   // --- Line 3 ---
   bindTextInput('third-line-input', 'thirdLineText');
   bindSelect('third-line-font', 'thirdLineFont');
-  bindSlider('third-line-size', 'thirdLineSize', parseInt);
+  bindSlider('third-line-size', 'thirdLineSize', parseFloat);
   bindSlider('third-line-curve', 'thirdLineCurve', parseFloat);
   bindSlider('third-line-offset-x', 'thirdLineOffsetX', parseFloat);
   bindSlider('third-line-offset-y', 'thirdLineOffsetY', parseFloat);
+  bindSlider('third-line-letter-spacing', 'thirdLineLetterSpacing', parseFloat);
+  bindSlider('third-line-extrude-depth', 'thirdLineExtrudeDepth', parseFloat);
+  bindCheckbox('third-line-bevel-toggle', 'thirdLineBevelEnabled');
 
-  // --- Shared text ---
+  // --- Shared text layout ---
   bindSlider('line-spacing', 'lineSpacing', parseFloat);
-  bindSlider('letter-spacing', 'letterSpacing', parseFloat);
   bindSelect('text-alignment', 'textAlignment');
-  bindSlider('extrude-depth', 'extrudeDepth', parseInt);
-  bindCheckbox('bevel-toggle', 'bevelEnabled');
   bindCheckbox('engrave-toggle', 'engrave');
 
   // --- Plate ---
@@ -176,17 +218,21 @@ export function initUI(onChange) {
     'text-curve': 'textCurve',
     'text-offset-x': 'textOffsetX',
     'text-offset-y': 'textOffsetY',
+    'letter-spacing': 'letterSpacing',
+    'extrude-depth': 'extrudeDepth',
     'second-line-size': 'secondLineSize',
     'second-line-curve': 'secondLineCurve',
     'second-line-offset-x': 'secondLineOffsetX',
     'second-line-offset-y': 'secondLineOffsetY',
+    'second-line-letter-spacing': 'secondLineLetterSpacing',
+    'second-line-extrude-depth': 'secondLineExtrudeDepth',
     'third-line-size': 'thirdLineSize',
     'third-line-curve': 'thirdLineCurve',
     'third-line-offset-x': 'thirdLineOffsetX',
     'third-line-offset-y': 'thirdLineOffsetY',
+    'third-line-letter-spacing': 'thirdLineLetterSpacing',
+    'third-line-extrude-depth': 'thirdLineExtrudeDepth',
     'line-spacing': 'lineSpacing',
-    'letter-spacing': 'letterSpacing',
-    'extrude-depth': 'extrudeDepth',
     'plate-padding': 'platePadding',
     'plate-radius': 'plateRadius',
     'plate-thickness': 'plateThickness',
@@ -203,6 +249,8 @@ export function initUI(onChange) {
 
   const allCheckboxes = {
     'bevel-toggle': 'bevelEnabled',
+    'second-line-bevel-toggle': 'secondLineBevelEnabled',
+    'third-line-bevel-toggle': 'thirdLineBevelEnabled',
     'engrave-toggle': 'engrave',
     'matte-toggle': 'matteFinish',
     'two-tone-toggle': 'twoTone',
