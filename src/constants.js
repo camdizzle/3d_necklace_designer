@@ -136,7 +136,7 @@ export const DEFAULTS = {
   pendantScale: 1.0,
   pendantOffsetX: 5,
   pendantOffsetY: 24,
-  pendantOffsetZ: -6,
+  pendantOffsetZ: -3.5,
 
   // Chain
   chainScale: 1.0,
