@@ -282,6 +282,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     letterSpacing = 0,
     extrudeDepth = 8,
     bevelEnabled = true,
+    alignToPlate = false,
     platePadding,
     plateRadius,
     plateThickness,
@@ -297,6 +298,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     secondLineLetterSpacing = 0,
     secondLineExtrudeDepth = 8,
     secondLineBevelEnabled = true,
+    secondLineAlignToPlate = false,
     thirdLineText = '',
     thirdLineFont = 'helvetiker_bold',
     thirdLineSize = 14,
@@ -306,6 +308,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     thirdLineLetterSpacing = 0,
     thirdLineExtrudeDepth = 8,
     thirdLineBevelEnabled = true,
+    thirdLineAlignToPlate = false,
     engrave = false,
     borderWidth = 0,
     customShapePoints = null,
@@ -412,21 +415,24 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     lines.push({
       text: text.trim(), fontKey, size: textSize, curve: textCurve,
       offsetX: textOffsetX, offsetY: textOffsetY,
-      letterSpacing, extrudeDepth, bevelEnabled
+      letterSpacing, extrudeDepth, bevelEnabled,
+      alignToPlate
     });
   }
   if (secondLineText && secondLineText.trim().length > 0) {
     lines.push({
       text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve,
       offsetX: secondLineOffsetX, offsetY: secondLineOffsetY,
-      letterSpacing: secondLineLetterSpacing, extrudeDepth: secondLineExtrudeDepth, bevelEnabled: secondLineBevelEnabled
+      letterSpacing: secondLineLetterSpacing, extrudeDepth: secondLineExtrudeDepth, bevelEnabled: secondLineBevelEnabled,
+      alignToPlate: secondLineAlignToPlate
     });
   }
   if (thirdLineText && thirdLineText.trim().length > 0) {
     lines.push({
       text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve,
       offsetX: thirdLineOffsetX, offsetY: thirdLineOffsetY,
-      letterSpacing: thirdLineLetterSpacing, extrudeDepth: thirdLineExtrudeDepth, bevelEnabled: thirdLineBevelEnabled
+      letterSpacing: thirdLineLetterSpacing, extrudeDepth: thirdLineExtrudeDepth, bevelEnabled: thirdLineBevelEnabled,
+      alignToPlate: thirdLineAlignToPlate
     });
   }
 
@@ -443,35 +449,113 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   let totalTextWidth = 0;
   let totalTextHeight = 0;
   let textGroup = null;
+  const baseGapFactor = 0.3;
+  const gapFactor = baseGapFactor * lineSpacing;
+  const lineResults = [];
 
   if (hasText) {
     textGroup = new THREE.Group();
 
-    // Render each line and measure
-    const lineResults = [];
+    // First pass: render each line. For alignToPlate lines, render flat (curve=0)
+    // so we can accurately size the plate before computing the auto-curve.
     for (const line of lines) {
       const font = await loadFont(line.fontKey);
       const renderOpts = getTextRenderOpts(line.fontKey);
       const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
-      const usePerChar = line.letterSpacing !== 0 || line.curve !== 0;
+      const effectiveCurve = line.alignToPlate ? 0 : line.curve;
+      const usePerChar = line.letterSpacing !== 0 || effectiveCurve !== 0;
       const result = usePerChar
-        ? createCharacterMeshes(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, line.letterSpacing, line.curve, material, renderOpts)
+        ? createCharacterMeshes(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, line.letterSpacing, effectiveCurve, material, renderOpts)
         : createSingleTextMesh(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, material.clone(), renderOpts);
-      lineResults.push({ ...result, lineSize: line.size, offsetX: line.offsetX, offsetY: line.offsetY });
+      lineResults.push({
+        ...result,
+        lineSize: line.size,
+        offsetX: line.offsetX,
+        offsetY: line.offsetY,
+        font,
+        displayText,
+        renderOpts
+      });
     }
 
-    // Compute total dimensions and position each line
-    // lineSpacing: 1.0 = default gap (0.3 * preceding line size), scale from there
-    const baseGapFactor = 0.3;
-    const gapFactor = baseGapFactor * lineSpacing;
-    let totalH = 0;
+    // Measure total dimensions (using the flat first-pass geometry for plate sizing)
     for (let i = 0; i < lineResults.length; i++) {
       const lr = lineResults[i];
       totalTextWidth = Math.max(totalTextWidth, lr.width);
-      totalH += lr.height;
-      if (i > 0) totalH += lineResults[i - 1].lineSize * gapFactor;
+      totalTextHeight += lr.height;
+      if (i > 0) totalTextHeight += lineResults[i - 1].lineSize * gapFactor;
     }
-    totalTextHeight = totalH;
+  }
+
+  // Plate sizing: use text bounds if available, otherwise default size for image-only
+  const defaultImageSize = 60;
+  const contentW = hasText ? totalTextWidth : defaultImageSize;
+  const contentH = hasText ? totalTextHeight : defaultImageSize;
+  const rawW = contentW + platePadding * 2;
+  const rawH = contentH + platePadding * 2;
+  const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
+    pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
+  );
+
+  if (hasText) {
+    // Second pass: re-render alignToPlate lines with curve auto-computed from plate radius.
+    // Effective radius = inscribed radius minus half the padding so the text hugs the edge.
+    // Direction: first line curves positive (frown/top of plate), last line curves negative
+    // (smile/bottom of plate). Middle lines are left flat.
+    const hasAlignToPlate = lines.some(l => l.alignToPlate);
+    if (hasAlignToPlate) {
+      const effectiveRadius = Math.min(plateW, plateH) / 2 - platePadding * 0.5;
+      const computedCurve = effectiveRadius > 0 ? 300 / effectiveRadius : 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].alignToPlate) continue;
+
+        let sign = 0;
+        if (lines.length > 1) {
+          if (i === 0) sign = 1;
+          else if (i === lines.length - 1) sign = -1;
+        } else {
+          sign = lines[i].curve < 0 ? -1 : 1;
+        }
+        if (sign === 0) continue;
+
+        const curveValue = sign * computedCurve;
+        const line = lines[i];
+        const lr = lineResults[i];
+
+        // Dispose old flat meshes before replacing
+        lr.group.traverse((child) => {
+          if (child.isMesh) {
+            child.geometry.dispose();
+            child.material.dispose();
+          }
+        });
+
+        const newResult = createCharacterMeshes(
+          lr.displayText, lr.font, line.size, line.extrudeDepth, line.bevelEnabled,
+          line.letterSpacing, curveValue, material, lr.renderOpts
+        );
+
+        lineResults[i] = {
+          group: newResult.group,
+          width: newResult.width,
+          height: newResult.height,
+          lineSize: line.size,
+          offsetX: line.offsetX,
+          offsetY: line.offsetY,
+          font: lr.font,
+          displayText: lr.displayText,
+          renderOpts: lr.renderOpts
+        };
+      }
+
+      // Recompute total height with the new (curved) line heights
+      totalTextHeight = 0;
+      for (let i = 0; i < lineResults.length; i++) {
+        totalTextHeight += lineResults[i].height;
+        if (i > 0) totalTextHeight += lineResults[i - 1].lineSize * gapFactor;
+      }
+    }
 
     // Position lines top-to-bottom, centered vertically
     let cursorY = totalTextHeight / 2;
@@ -493,7 +577,6 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const lr = lineResults[i];
       const lineDepth = lines[i].extrudeDepth;
       if (engrave) {
-        // Recess line so its front face is 0.3 above the plate surface.
         lr.group.position.z = plateFrontZ + 0.3 - lineDepth;
       } else {
         lr.group.position.z = plateFrontZ;
@@ -507,20 +590,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         }
       });
     }
-  }
 
-  // Plate sizing: use text bounds if available, otherwise default size for image-only
-  const defaultImageSize = 60;
-  const contentW = hasText ? totalTextWidth : defaultImageSize;
-  const contentH = hasText ? totalTextHeight : defaultImageSize;
-  const rawW = contentW + platePadding * 2;
-  const rawH = contentH + platePadding * 2;
-  const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
-    pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
-  );
-
-  // Apply text alignment
-  if (hasText) {
+    // Apply text alignment
     let textAlignOffset = 0;
     if (textAlignment === 'left') {
       textAlignOffset = -(plateW / 2 - platePadding - totalTextWidth / 2);
