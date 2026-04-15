@@ -11,20 +11,23 @@ function isScriptFont(fontKey) {
   return SCRIPT_FONTS.includes(fontKey);
 }
 
-function getTextRenderOpts(fontKey) {
+// Bevel dimensions scale with text size so small fonts don't end up with
+// chunky bevels that dominate the letter forms. Factors chosen so size 24
+// matches the previous hard-coded values.
+function getTextRenderOpts(fontKey, textSize = 24) {
   if (isScriptFont(fontKey)) {
     return {
       curveSegments: 12,
-      bevelThickness: 0.4,
-      bevelSize: 0.25,
+      bevelThickness: textSize * 0.017,
+      bevelSize: textSize * 0.011,
       bevelSegments: 2,
       preserveCase: true
     };
   }
   return {
     curveSegments: 6,
-    bevelThickness: 1.5,
-    bevelSize: 1,
+    bevelThickness: textSize * 0.06,
+    bevelSize: textSize * 0.04,
     bevelSegments: 3,
     preserveCase: false
   };
@@ -460,7 +463,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     // so we can accurately size the plate before computing the auto-curve.
     for (const line of lines) {
       const font = await loadFont(line.fontKey);
-      const renderOpts = getTextRenderOpts(line.fontKey);
+      const renderOpts = getTextRenderOpts(line.fontKey, line.size);
       const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
       const effectiveCurve = line.alignToPlate ? 0 : line.curve;
       const usePerChar = line.letterSpacing !== 0 || effectiveCurve !== 0;
