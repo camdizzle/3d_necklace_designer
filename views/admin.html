@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chain Studio — Admin</title>
+  <style>
+    :root {
+      --bg: #0f0f1a;
+      --panel: #16213e;
+      --card: #1a1a2e;
+      --border: #2a2a4a;
+      --gold: #FFD700;
+      --text: #eee;
+      --dim: #888;
+      --green: #34d399;
+      --blue: #60a5fa;
+      --orange: #fbbf24;
+      --red: #f87171;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 18px;
+      letter-spacing: 2px;
+      color: var(--gold);
+    }
+
+    .stats {
+      display: flex;
+      gap: 24px;
+      font-size: 13px;
+      color: var(--dim);
+    }
+
+    .stats strong {
+      color: var(--text);
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .filter-btn.active {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .order-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .order-card:hover {
+      border-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .order-id {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--gold);
+    }
+
+    .order-date {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    .order-design {
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    .order-customer {
+      font-size: 13px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge.new { background: rgba(96, 165, 250, 0.2); color: var(--blue); }
+    .badge.printing { background: rgba(251, 191, 36, 0.2); color: var(--orange); }
+    .badge.shipped { background: rgba(52, 211, 153, 0.2); color: var(--green); }
+    .badge.delivered { background: rgba(52, 211, 153, 0.3); color: var(--green); }
+
+    .order-amount {
+      font-size: 18px;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .order-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      padding: 5px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn:hover { border-color: var(--gold); color: var(--gold); }
+    .btn.primary { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
+    .btn.primary:hover { opacity: 0.9; }
+
+    /* Detail modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-width: 520px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .modal h2 {
+      font-size: 16px;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+
+    .modal label {
+      display: block;
+      font-size: 11px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 12px;
+      margin-bottom: 4px;
+    }
+
+    .modal select, .modal input, .modal textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .modal textarea { resize: vertical; min-height: 60px; }
+
+    .modal .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    .shipping-address {
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 8px;
+      background: var(--card);
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 48px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+
+    .refresh-hint {
+      text-align: center;
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CHAIN STUDIO ADMIN</h1>
+    <div class="stats">
+      <span>Orders: <strong id="stat-total">0</strong></span>
+      <span>Pending: <strong id="stat-pending">0</strong></span>
+      <span>Revenue: <strong id="stat-revenue">$0</strong></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="filters">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="new">New</button>
+      <button class="filter-btn" data-filter="printing">Printing</button>
+      <button class="filter-btn" data-filter="shipped">Shipped</button>
+      <button class="filter-btn" data-filter="delivered">Delivered</button>
+    </div>
+    <div class="order-list" id="order-list"></div>
+    <p class="refresh-hint">Auto-refreshes every 30 seconds</p>
+  </main>
+
+  <!-- Detail / Edit Modal -->
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal">
+      <h2 id="modal-title">Order Details</h2>
+
+      <label>Status</label>
+      <select id="modal-status">
+        <option value="new">New</option>
+        <option value="printing">Printing</option>
+        <option value="shipped">Shipped</option>
+        <option value="delivered">Delivered</option>
+      </select>
+
+      <label>Design</label>
+      <div id="modal-design" style="font-size:13px;"></div>
+
+      <label>Customer</label>
+      <div id="modal-customer" style="font-size:13px;"></div>
+
+      <label>Shipping Address</label>
+      <div class="shipping-address" id="modal-shipping">—</div>
+
+      <label>Tracking Carrier</label>
+      <input id="modal-carrier" placeholder="USPS, UPS, FedEx..." />
+
+      <label>Tracking Number</label>
+      <input id="modal-tracking" placeholder="9400111..." />
+
+      <label>Notes</label>
+      <textarea id="modal-notes" placeholder="Internal notes..."></textarea>
+
+      <div class="btn-row">
+        <button class="btn" id="modal-stl">Download STL</button>
+        <button class="btn" id="modal-close">Cancel</button>
+        <button class="btn primary" id="modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let orders = [];
+    let currentFilter = 'all';
+    let currentOrderId = null;
+
+    // ---------------------------------------------------------------
+    // Fetch orders
+    // ---------------------------------------------------------------
+    async function fetchOrders() {
+      try {
+        const res = await fetch('/admin/api/orders');
+        if (!res.ok) throw new Error(res.statusText);
+        orders = await res.json();
+      } catch (err) {
+        console.error('Failed to fetch orders:', err);
+        orders = [];
+      }
+      render();
+    }
+
+    // ---------------------------------------------------------------
+    // Render
+    // ---------------------------------------------------------------
+    function money(cents, currency = 'usd') {
+      return (currency === 'usd' ? '$' : currency.toUpperCase() + ' ') + (cents / 100).toFixed(2);
+    }
+
+    function timeAgo(iso) {
+      const diff = Date.now() - new Date(iso).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return mins + 'm ago';
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      const days = Math.floor(hrs / 24);
+      return days + 'd ago';
+    }
+
+    function render() {
+      const filtered = currentFilter === 'all'
+        ? orders
+        : orders.filter(o => o.status === currentFilter);
+
+      // Stats
+      document.getElementById('stat-total').textContent = orders.length;
+      document.getElementById('stat-pending').textContent =
+        orders.filter(o => o.status === 'new' || o.status === 'printing').length;
+      document.getElementById('stat-revenue').textContent =
+        money(orders.reduce((sum, o) => sum + (o.amountTotal || 0), 0));
+
+      // Filter buttons
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === currentFilter);
+      });
+
+      // Order cards
+      const list = document.getElementById('order-list');
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="empty">No orders yet. They\'ll show up here after customers check out.</div>';
+        return;
+      }
+
+      list.innerHTML = filtered.map(o => `
+        <div class="order-card" data-id="${o.id}">
+          <div>
+            <div class="order-id">${o.id}</div>
+            <div class="order-date">${timeAgo(o.createdAt)}</div>
+            <div class="order-design">${esc(o.designName)}</div>
+            <div class="order-customer">${esc(o.customerName)} &mdash; ${esc(o.customerEmail)}</div>
+          </div>
+          <div style="text-align:center;">
+            <span class="badge ${o.status}">${o.status}</span>
+          </div>
+          <div>
+            <div class="order-amount">${money(o.amountTotal, o.currency)}</div>
+            <div class="order-actions">
+              <button class="btn" onclick="openOrder('${o.id}')">Manage</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    // ---------------------------------------------------------------
+    // Filters
+    // ---------------------------------------------------------------
+    document.querySelector('.filters').addEventListener('click', (e) => {
+      if (e.target.dataset.filter) {
+        currentFilter = e.target.dataset.filter;
+        render();
+      }
+    });
+
+    // ---------------------------------------------------------------
+    // Modal
+    // ---------------------------------------------------------------
+    function openOrder(id) {
+      const order = orders.find(o => o.id === id);
+      if (!order) return;
+      currentOrderId = id;
+
+      document.getElementById('modal-title').textContent = `Order ${id}`;
+      document.getElementById('modal-status').value = order.status;
+      document.getElementById('modal-design').textContent =
+        `${order.designName}${order.designDetails ? ' — ' + order.designDetails : ''}`;
+      document.getElementById('modal-customer').textContent =
+        `${order.customerName} <${order.customerEmail}>`;
+
+      // Shipping
+      const s = order.shipping;
+      if (s && s.address) {
+        const a = s.address;
+        document.getElementById('modal-shipping').innerHTML =
+          [s.name, a.line1, a.line2, [a.city, a.state, a.postal_code].filter(Boolean).join(', '), a.country]
+            .filter(Boolean).join('<br>');
+      } else {
+        document.getElementById('modal-shipping').textContent = '—';
+      }
+
+      document.getElementById('modal-carrier').value = order.trackingCarrier || '';
+      document.getElementById('modal-tracking').value = order.trackingNumber || '';
+      document.getElementById('modal-notes').value = order.notes || '';
+
+      document.getElementById('modal-backdrop').classList.add('open');
+    }
+
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('modal-backdrop').classList.remove('open');
+    });
+
+    document.getElementById('modal-backdrop').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) {
+        document.getElementById('modal-backdrop').classList.remove('open');
+      }
+    });
+
+    document.getElementById('modal-stl').addEventListener('click', () => {
+      if (currentOrderId) {
+        window.open(`/admin/api/orders/${currentOrderId}/stl`, '_blank');
+      }
+    });
+
+    document.getElementById('modal-save').addEventListener('click', async () => {
+      if (!currentOrderId) return;
+
+      const body = {
+        status: document.getElementById('modal-status').value,
+        trackingCarrier: document.getElementById('modal-carrier').value.trim(),
+        trackingNumber: document.getElementById('modal-tracking').value.trim(),
+        notes: document.getElementById('modal-notes').value
+      };
+
+      try {
+        const res = await fetch(`/admin/api/orders/${currentOrderId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error(res.statusText);
+
+        document.getElementById('modal-backdrop').classList.remove('open');
+        await fetchOrders();
+      } catch (err) {
+        alert('Failed to save: ' + err.message);
+      }
+    });
+
+    // ---------------------------------------------------------------
+    // Boot + auto-refresh
+    // ---------------------------------------------------------------
+    fetchOrders();
+    setInterval(fetchOrders, 30000);
+  </script>
+</body>
+</html>

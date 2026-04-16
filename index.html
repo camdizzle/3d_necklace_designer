@@ -304,6 +304,152 @@
       transform: translateY(0);
     }
 
+    #order-btn {
+      margin: 4px 20px 8px;
+      padding: 14px;
+      background: linear-gradient(135deg, #e94560, #c0392b);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    #order-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(233, 69, 96, 0.3);
+    }
+
+    #order-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Order modal */
+    .order-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0,0,0,0.6);
+    }
+
+    .order-modal.open { display: flex; }
+
+    .order-modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .order-modal-card h2 {
+      color: var(--gold);
+      font-size: 18px;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .order-modal-card p {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .order-modal-price {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      margin: 16px 0;
+    }
+
+    .order-modal-price span {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-dim);
+    }
+
+    .order-modal-details {
+      text-align: left;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 12px 0 16px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+    }
+
+    .order-modal-details strong {
+      color: var(--text);
+    }
+
+    .order-modal-go {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #e94560, #c0392b);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .order-modal-go:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    .order-modal-cancel {
+      margin-top: 10px;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    /* Order success/cancel toast */
+    .order-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      z-index: 300;
+      animation: toast-in 0.3s ease;
+    }
+
+    .order-toast.success {
+      background: #166534;
+      color: #bbf7d0;
+      border: 1px solid #22c55e;
+    }
+
+    .order-toast.cancelled {
+      background: #7f1d1d;
+      color: #fecaca;
+      border: 1px solid #ef4444;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
     /* File input styling */
     .file-input-wrapper {
       position: relative;
@@ -420,6 +566,252 @@
     #panel::-webkit-scrollbar-track { background: var(--bg-panel); }
     #panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
     #panel::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    /* ======================================================
+       Premium / Pro gating
+       ====================================================== */
+
+    /* Lock badge shown next to a locked control's label */
+    .premium-lock {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #1a1a2e;
+      background: linear-gradient(135deg, var(--gold), #B8860B);
+      border-radius: 3px;
+      vertical-align: middle;
+      cursor: pointer;
+    }
+    .premium-lock::before {
+      content: '🔒 ';
+      font-size: 9px;
+    }
+
+    /* Option inside a <select> that requires Pro — prefixed visually */
+    option.premium-option::before {
+      content: '🔒 ';
+    }
+
+    /* Pro status indicator in the header */
+    #pro-status {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: opacity 0.15s;
+    }
+    #pro-status:hover { opacity: 0.85; }
+    #pro-status.free {
+      background: var(--bg-input);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    #pro-status.pro {
+      background: linear-gradient(135deg, var(--gold), #B8860B);
+      color: #1a1a2e;
+      border: 1px solid var(--gold);
+    }
+    #pro-status.pro::before { content: '✓ '; }
+
+    /* Dimmed state for locked color/material buttons */
+    .color-btn.locked {
+      position: relative;
+      opacity: 0.55;
+    }
+    .color-btn.locked::after {
+      content: '🔒';
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      font-size: 9px;
+    }
+
+    /* Upgrade modal */
+    .premium-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .premium-modal.hidden { display: none; }
+
+    .premium-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 14, 30, 0.78);
+      backdrop-filter: blur(4px);
+    }
+
+    .premium-modal-card {
+      position: relative;
+      width: min(420px, calc(100vw - 40px));
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 32px 28px 24px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    }
+
+    .premium-modal-close {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    .premium-modal-close:hover { color: var(--text); }
+
+    .premium-modal-lock {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .premium-modal-card h2 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+
+    .premium-modal-feature {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+    }
+    .premium-modal-feature strong {
+      color: var(--text);
+    }
+
+    .premium-modal-benefits {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px 0;
+      text-align: left;
+    }
+    .premium-modal-benefits li {
+      font-size: 12px;
+      color: var(--text);
+      padding: 4px 0 4px 22px;
+      position: relative;
+    }
+    .premium-modal-benefits li::before {
+      content: '✓';
+      position: absolute;
+      left: 4px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .premium-modal-price {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--gold);
+      margin-bottom: 14px;
+    }
+    .premium-modal-price span {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .premium-modal-buy {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--gold), #B8860B);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .premium-modal-buy:hover { transform: translateY(-1px); }
+
+    .premium-modal-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 18px 0 12px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .premium-modal-divider::before,
+    .premium-modal-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .premium-modal-license-row {
+      display: flex;
+      gap: 6px;
+    }
+    .premium-modal-license-row input {
+      flex: 1;
+      padding: 9px 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      outline: none;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .premium-modal-license-row input:focus {
+      border-color: var(--gold);
+    }
+    .premium-modal-license-row button {
+      padding: 9px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .premium-modal-license-row button:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .premium-modal-error {
+      font-size: 11px;
+      color: var(--accent);
+      margin-top: 8px;
+      min-height: 14px;
+    }
   </style>
 </head>
 <body>
@@ -428,6 +820,7 @@
       <div id="panel-header">
         <h1>Chain Studio</h1>
         <p>3D Necklace Designer</p>
+        <div id="pro-status" class="free" title="Click to unlock Pro">FREE</div>
       </div>
 
       <!-- LINE 1 -->
@@ -435,7 +828,7 @@
         <div class="section-title">Line 1</div>
         <div class="control-group">
           <label for="text-input">Text</label>
-          <input type="text" id="text-input" value="KING" maxlength="16" spellcheck="false">
+          <input type="text" id="text-input" value="Test" maxlength="16" spellcheck="false">
         </div>
         <div class="control-group">
           <label for="font-select">Font</label>
@@ -521,7 +914,7 @@
         <div class="section-title">Line 2</div>
         <div class="control-group">
           <label for="second-line-input">Text</label>
-          <input type="text" id="second-line-input" value="" maxlength="20" spellcheck="false" placeholder="Optional">
+          <input type="text" id="second-line-input" value="Name" maxlength="20" spellcheck="false" placeholder="Optional">
         </div>
         <div class="control-group">
           <label for="second-line-font">Font</label>
@@ -607,7 +1000,7 @@
         <div class="section-title">Line 3</div>
         <div class="control-group">
           <label for="third-line-input">Text</label>
-          <input type="text" id="third-line-input" value="" maxlength="20" spellcheck="false" placeholder="Optional">
+          <input type="text" id="third-line-input" value="Date" maxlength="20" spellcheck="false" placeholder="Optional">
         </div>
         <div class="control-group">
           <label for="third-line-font">Font</label>
@@ -817,8 +1210,8 @@
         <div class="control-group">
           <label>Plate Thickness</label>
           <div class="slider-row">
-            <input type="range" id="plate-thickness" min="1" max="10" value="3" step="0.5">
-            <span class="slider-value" id="plate-thickness-val">3</span>
+            <input type="range" id="plate-thickness" min="1" max="10" value="4.5" step="0.5">
+            <span class="slider-value" id="plate-thickness-val">4.5</span>
           </div>
         </div>
         <div class="control-group">
@@ -843,22 +1236,22 @@
         <div class="control-group">
           <label>Offset X</label>
           <div class="slider-row">
-            <input type="range" id="pendant-offset-x" min="-50" max="50" value="0" step="1">
-            <span class="slider-value" id="pendant-offset-x-val">0</span>
+            <input type="range" id="pendant-offset-x" min="-50" max="50" value="5" step="1">
+            <span class="slider-value" id="pendant-offset-x-val">5</span>
           </div>
         </div>
         <div class="control-group">
           <label>Offset Y</label>
           <div class="slider-row">
-            <input type="range" id="pendant-offset-y" min="-50" max="50" value="0" step="1">
-            <span class="slider-value" id="pendant-offset-y-val">0</span>
+            <input type="range" id="pendant-offset-y" min="-50" max="50" value="24" step="1">
+            <span class="slider-value" id="pendant-offset-y-val">24</span>
           </div>
         </div>
         <div class="control-group">
           <label>Offset Z</label>
           <div class="slider-row">
-            <input type="range" id="pendant-offset-z" min="-20" max="20" value="-2.5" step="0.5">
-            <span class="slider-value" id="pendant-offset-z-val">-2.5</span>
+            <input type="range" id="pendant-offset-z" min="-20" max="20" value="-3.5" step="0.5">
+            <span class="slider-value" id="pendant-offset-z-val">-3.5</span>
           </div>
         </div>
       </div>
@@ -961,6 +1354,7 @@
       </div>
 
       <button id="export-btn">Export Model</button>
+      <button id="order-btn">Order This Chain</button>
 
       <div class="btn-row">
         <button class="btn-action" id="screenshot-btn">Screenshot</button>
@@ -982,6 +1376,19 @@
       </div>
       <div id="dimensions-display"></div>
       <div id="viewport-hint">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</div>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div class="order-modal" id="order-modal">
+    <div class="order-modal-card">
+      <h2>Order Your Custom Chain</h2>
+      <p>We'll 3D print your exact design and ship it to you.</p>
+      <div class="order-modal-price">$29.99 <span>+ free shipping</span></div>
+      <div class="order-modal-details" id="order-modal-details"></div>
+      <button class="order-modal-go" id="order-modal-go">Proceed to Checkout</button>
+      <br>
+      <button class="order-modal-cancel" id="order-modal-cancel">Cancel</button>
     </div>
   </div>
 

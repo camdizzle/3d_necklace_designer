@@ -1,0 +1,155 @@
+// Transactional email via Resend.
+//
+// Sends two emails per order:
+//   1. Order confirmation to the customer.
+//   2. New-order notification to you (the admin).
+
+const RESEND_API = 'https://api.resend.com/emails';
+
+async function sendEmail({ to, subject, html }) {
+  const apiKey = process.env.EMAIL_API_KEY;
+  const from = process.env.EMAIL_FROM || 'Chain Studio <orders@yourdomain.com>';
+
+  if (!apiKey) {
+    console.warn('EMAIL_API_KEY not set — skipping email');
+    return;
+  }
+
+  const res = await fetch(RESEND_API, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ from, to: [to], subject, html })
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Resend API error ${res.status}: ${body}`);
+  }
+
+  return res.json();
+}
+
+function formatMoney(cents, currency = 'usd') {
+  const dollars = (cents / 100).toFixed(2);
+  const symbol = currency === 'usd' ? '$' : currency.toUpperCase() + ' ';
+  return `${symbol}${dollars}`;
+}
+
+function shippingBlock(shipping) {
+  if (!shipping || !shipping.address) return '<p>No shipping address collected.</p>';
+  const a = shipping.address;
+  const lines = [
+    shipping.name || '',
+    a.line1 || '',
+    a.line2 || '',
+    [a.city, a.state, a.postal_code].filter(Boolean).join(', '),
+    a.country || ''
+  ].filter(Boolean);
+  return `<p>${lines.join('<br>')}</p>`;
+}
+
+export async function sendOrderConfirmation(order) {
+  const baseUrl = process.env.BASE_URL || 'https://yourdomain.com';
+
+  const html = `
+    <div style="font-family: 'Segoe UI', system-ui, sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a2e;">
+      <div style="background: #16213e; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #FFD700; margin: 0; font-size: 22px; letter-spacing: 2px;">CHAIN STUDIO</h1>
+      </div>
+      <div style="padding: 24px; background: #f9f9fb; border-radius: 0 0 8px 8px;">
+        <h2 style="margin-top: 0;">Order Confirmed!</h2>
+        <p>Hey ${order.customerName || 'there'},</p>
+        <p>We got your order and we're getting it printed. Here's the summary:</p>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px 0; color: #666;">Order ID</td>
+            <td style="padding: 8px 0; font-weight: 600;">${order.id}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px 0; color: #666;">Design</td>
+            <td style="padding: 8px 0;">${order.designName}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px 0; color: #666;">Total</td>
+            <td style="padding: 8px 0; font-weight: 600;">${formatMoney(order.amountTotal, order.currency)}</td>
+          </tr>
+        </table>
+
+        <h3 style="margin-bottom: 4px;">Shipping to:</h3>
+        ${shippingBlock(order.shipping)}
+
+        <p style="margin-top: 24px; font-size: 13px; color: #666;">
+          We'll email you again when your chain ships with a tracking number.
+          Questions? Just reply to this email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: order.customerEmail,
+    subject: `Order confirmed: ${order.designName} — ${order.id}`,
+    html
+  });
+}
+
+export async function sendAdminNotification(order) {
+  const adminEmail = process.env.EMAIL_FROM || 'orders@yourdomain.com';
+  const baseUrl = process.env.BASE_URL || 'https://yourdomain.com';
+
+  const html = `
+    <div style="font-family: monospace; max-width: 560px;">
+      <h2>New Order: ${order.id}</h2>
+      <p><strong>Customer:</strong> ${order.customerName} &lt;${order.customerEmail}&gt;</p>
+      <p><strong>Design:</strong> ${order.designName}</p>
+      <p><strong>Details:</strong> ${order.designDetails || '—'}</p>
+      <p><strong>Total:</strong> ${formatMoney(order.amountTotal, order.currency)}</p>
+      <h3>Ship to:</h3>
+      ${shippingBlock(order.shipping)}
+      <p><a href="${baseUrl}/admin">Open admin dashboard</a></p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: adminEmail,
+    subject: `NEW ORDER: ${order.id} — ${order.designName} — ${formatMoney(order.amountTotal, order.currency)}`,
+    html
+  });
+}
+
+export async function sendShippingNotification(order) {
+  if (!order.customerEmail || !order.trackingNumber) return;
+
+  const html = `
+    <div style="font-family: 'Segoe UI', system-ui, sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a2e;">
+      <div style="background: #16213e; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #FFD700; margin: 0; font-size: 22px; letter-spacing: 2px;">CHAIN STUDIO</h1>
+      </div>
+      <div style="padding: 24px; background: #f9f9fb; border-radius: 0 0 8px 8px;">
+        <h2 style="margin-top: 0;">Your Chain Has Shipped!</h2>
+        <p>Hey ${order.customerName || 'there'},</p>
+        <p>Your custom chain (${order.designName}) is on its way.</p>
+
+        <div style="background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin: 16px 0; text-align: center;">
+          <p style="margin: 0 0 4px; color: #666; font-size: 12px; text-transform: uppercase;">${order.trackingCarrier || 'Tracking Number'}</p>
+          <p style="margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 1px;">${order.trackingNumber}</p>
+        </div>
+
+        <p style="font-size: 13px; color: #666;">
+          Delivery typically takes 3-7 business days. If you have questions,
+          just reply to this email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: order.customerEmail,
+    subject: `Your chain shipped! Tracking: ${order.trackingNumber}`,
+    html
+  });
+}

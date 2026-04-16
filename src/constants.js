@@ -81,7 +81,7 @@ export const FONT_LABELS = {
 
 export const DEFAULTS = {
   // Line 1
-  text: 'KING',
+  text: 'Test',
   font: 'helvetiker_bold',
   textSize: 24,
   textCurve: 0,
@@ -93,7 +93,7 @@ export const DEFAULTS = {
   alignToPlate: false,
 
   // Line 2
-  secondLineText: '',
+  secondLineText: 'Name',
   secondLineFont: 'helvetiker_bold',
   secondLineSize: 16,
   secondLineCurve: 0,
@@ -105,7 +105,7 @@ export const DEFAULTS = {
   secondLineAlignToPlate: false,
 
   // Line 3
-  thirdLineText: '',
+  thirdLineText: 'Date',
   thirdLineFont: 'helvetiker_bold',
   thirdLineSize: 14,
   thirdLineCurve: 0,
@@ -126,7 +126,7 @@ export const DEFAULTS = {
   // Plate
   platePadding: 8,
   plateRadius: 5,
-  plateThickness: 3,
+  plateThickness: 4.5,
   pendantShape: 'rectangle',
   engrave: false,
   borderWidth: 0,
@@ -134,9 +134,9 @@ export const DEFAULTS = {
 
   // Pendant position
   pendantScale: 1.0,
-  pendantOffsetX: 0,
-  pendantOffsetY: 0,
-  pendantOffsetZ: -2.5,
+  pendantOffsetX: 5,
+  pendantOffsetY: 24,
+  pendantOffsetZ: -3.5,
 
   // Chain
   chainScale: 1.0,
