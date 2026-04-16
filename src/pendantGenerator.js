@@ -392,20 +392,20 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
       if (connHeight > 0) {
         const stlBackZ = stlMidZ - stlD / 2;
-        const bailRadius = chainThickness * 0.35;
+        const bailRadius = chainThickness * 0.4;
         const armHeight = connHeight - bailRadius * 2;
 
         if (armHeight > 0) {
-          const bottomWidth = chainThickness * 0.5;
           const topWidth = bailRadius * 2;
+          const bottomWidth = Math.max(topWidth + 1, chainThickness * 0.9);
           const armDepth = stlD;
 
           const armShape = new THREE.Shape();
           armShape.moveTo(-bottomWidth / 2, 0);
           armShape.lineTo(bottomWidth / 2, 0);
-          armShape.quadraticCurveTo(topWidth / 2, armHeight * 0.6, topWidth / 2, armHeight);
+          armShape.quadraticCurveTo(bottomWidth * 0.3, armHeight * 0.5, topWidth / 2, armHeight);
           armShape.lineTo(-topWidth / 2, armHeight);
-          armShape.quadraticCurveTo(-topWidth / 2, armHeight * 0.6, -bottomWidth / 2, 0);
+          armShape.quadraticCurveTo(-bottomWidth * 0.3, armHeight * 0.5, -bottomWidth / 2, 0);
 
           const armGeo = new THREE.ExtrudeGeometry(armShape, {
             depth: armDepth,
@@ -417,7 +417,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         }
 
         const bailLength = stlD + 2;
-        const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 16);
+        const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 24);
         bailGeo.rotateX(Math.PI / 2);
         const bailY = connLocalBottom + connHeight - bailRadius;
         bailGeo.translate(0, bailY, stlBackZ + stlD / 2);
@@ -745,20 +745,20 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     if (connHeight > 0) {
       const plateBackZ = -0.5;
 
-      const bailRadius = chainThickness * 0.35;
+      const bailRadius = chainThickness * 0.4;
       const armHeight = connHeight - bailRadius * 2;
 
       if (armHeight > 0) {
-        const bottomWidth = chainThickness * 0.5;
         const topWidth = bailRadius * 2;
+        const bottomWidth = Math.max(topWidth + 1, chainThickness * 0.9);
         const armDepth = plateThickness;
 
         const armShape = new THREE.Shape();
         armShape.moveTo(-bottomWidth / 2, 0);
         armShape.lineTo(bottomWidth / 2, 0);
-        armShape.quadraticCurveTo(topWidth / 2, armHeight * 0.6, topWidth / 2, armHeight);
+        armShape.quadraticCurveTo(bottomWidth * 0.3, armHeight * 0.5, topWidth / 2, armHeight);
         armShape.lineTo(-topWidth / 2, armHeight);
-        armShape.quadraticCurveTo(-topWidth / 2, armHeight * 0.6, -bottomWidth / 2, 0);
+        armShape.quadraticCurveTo(-bottomWidth * 0.3, armHeight * 0.5, -bottomWidth / 2, 0);
 
         const armGeo = new THREE.ExtrudeGeometry(armShape, {
           depth: armDepth,
@@ -770,7 +770,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       }
 
       const bailLength = plateThickness + 2;
-      const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 16);
+      const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 24);
       bailGeo.rotateX(Math.PI / 2);
       const bailY = connLocalBottom + connHeight - bailRadius;
       bailGeo.translate(0, bailY, plateBackZ + plateThickness / 2);
