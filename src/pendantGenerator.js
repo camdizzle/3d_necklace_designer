@@ -490,6 +490,12 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const result = usePerChar
         ? createCharacterMeshes(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, line.letterSpacing, effectiveCurve, lineMat, renderOpts)
         : createSingleTextMesh(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, lineMat.clone(), renderOpts);
+      // Tag meshes with per-line color so updateMaterialOnGroup can skip them
+      if (line.color) {
+        result.group.traverse((child) => {
+          if (child.isMesh) child.userData.hasLineColor = true;
+        });
+      }
       lineResults.push({
         ...result,
         lineSize: line.size,
@@ -561,6 +567,11 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
           lr.displayText, lr.font, line.size, line.extrudeDepth, line.bevelEnabled,
           line.letterSpacing, curveValue, reLineMat, lr.renderOpts
         );
+        if (line.color) {
+          newResult.group.traverse((child) => {
+            if (child.isMesh) child.userData.hasLineColor = true;
+          });
+        }
 
         lineResults[i] = {
           group: newResult.group,
@@ -762,6 +773,8 @@ export function updateMaterialOnGroup(group, materialOpts) {
   const mat = createMaterial(materialOpts.key || 'gold', materialOpts);
   group.traverse((child) => {
     if (child.isMesh) {
+      // Skip meshes with per-line custom colors — they keep their own color
+      if (child.userData.hasLineColor) return;
       child.material.color.copy(mat.color);
       child.material.metalness = mat.metalness;
       child.material.roughness = mat.roughness;
