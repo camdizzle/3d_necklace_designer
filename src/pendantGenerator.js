@@ -391,9 +391,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const connHeight = connLocalTop - connLocalBottom;
 
       if (connHeight > 0) {
-        const bottomWidth = chainThickness * 0.4;
-        const topWidth = chainThickness * 0.25;
-        const connDepth = stlD;
+        const bottomWidth = chainThickness * 0.7;
+        const topWidth = chainThickness * 0.5;
+        const connDepth = stlD + 2;
 
         const connShape = new THREE.Shape();
         connShape.moveTo(-bottomWidth / 2, 0);
@@ -729,10 +729,10 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const connHeight = connLocalTop - connLocalBottom;
 
     if (connHeight > 0) {
-      // Tapered connector: wider at plate, narrower at chain for strength + aesthetics
-      const bottomWidth = chainThickness * 0.4;  // width where it meets the plate
-      const topWidth = chainThickness * 0.25;     // width where it meets the chain
-      const connDepth = plateThickness;
+      // Sturdy tapered connector: wide enough to survive 3D printing
+      const bottomWidth = chainThickness * 0.7;
+      const topWidth = chainThickness * 0.5;
+      const connDepth = plateThickness + 2;
 
       const connShape = new THREE.Shape();
       connShape.moveTo(-bottomWidth / 2, 0);
