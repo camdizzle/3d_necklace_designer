@@ -136,6 +136,9 @@ export const DEFAULTS = {
   engrave: false,
   borderWidth: 0,
   customShapePoints: null,
+  lockPendantSize: false,
+  lockedPlateW: null,
+  lockedPlateH: null,
 
   // Pendant position
   pendantScale: 1.0,

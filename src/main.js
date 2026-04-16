@@ -163,10 +163,18 @@ async function rebuildPendant(state) {
     customSTLGeometry: state.customSTLGeometry,
     lineColor1: state.lineColor1,
     lineColor2: state.lineColor2,
-    lineColor3: state.lineColor3
+    lineColor3: state.lineColor3,
+    lockedPlateW: state.lockPendantSize ? state.lockedPlateW : null,
+    lockedPlateH: state.lockPendantSize ? state.lockedPlateH : null
   }, getMaterialOpts(state), scaledChainInfo);
 
   if (!result) return;
+
+  // Capture plate dimensions for lock feature
+  if (result.rawW != null && result.rawH != null) {
+    state.lockedPlateW = result.rawW;
+    state.lockedPlateH = result.rawH;
+  }
 
   pendantGroup = result.group;
 
