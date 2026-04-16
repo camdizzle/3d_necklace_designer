@@ -392,20 +392,20 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
       if (connHeight > 0) {
         const stlBackZ = stlMidZ - stlD / 2;
-        const bailRadius = chainThickness * 0.22;
+        const bailRadius = chainThickness * 0.35;
         const armHeight = connHeight - bailRadius * 2;
 
         if (armHeight > 0) {
-          const bottomWidth = chainThickness * 0.55;
+          const bottomWidth = chainThickness * 0.5;
           const topWidth = bailRadius * 2;
           const armDepth = stlD;
 
           const armShape = new THREE.Shape();
           armShape.moveTo(-bottomWidth / 2, 0);
           armShape.lineTo(bottomWidth / 2, 0);
-          armShape.lineTo(topWidth / 2, armHeight);
+          armShape.quadraticCurveTo(topWidth / 2, armHeight * 0.6, topWidth / 2, armHeight);
           armShape.lineTo(-topWidth / 2, armHeight);
-          armShape.closePath();
+          armShape.quadraticCurveTo(-topWidth / 2, armHeight * 0.6, -bottomWidth / 2, 0);
 
           const armGeo = new THREE.ExtrudeGeometry(armShape, {
             depth: armDepth,
@@ -743,41 +743,34 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const connHeight = connLocalTop - connLocalBottom;
 
     if (connHeight > 0) {
-      // Plate back is at Z = -0.5, front at plateThickness - 0.5
       const plateBackZ = -0.5;
 
-      // --- Part 1: Tapered arm from plate top to just below the bail ---
-      // Slightly thinner than before, flush with plate back
-      const bailRadius = chainThickness * 0.22;
+      const bailRadius = chainThickness * 0.35;
       const armHeight = connHeight - bailRadius * 2;
 
       if (armHeight > 0) {
-        const bottomWidth = chainThickness * 0.55;
+        const bottomWidth = chainThickness * 0.5;
         const topWidth = bailRadius * 2;
         const armDepth = plateThickness;
 
         const armShape = new THREE.Shape();
         armShape.moveTo(-bottomWidth / 2, 0);
         armShape.lineTo(bottomWidth / 2, 0);
-        armShape.lineTo(topWidth / 2, armHeight);
+        armShape.quadraticCurveTo(topWidth / 2, armHeight * 0.6, topWidth / 2, armHeight);
         armShape.lineTo(-topWidth / 2, armHeight);
-        armShape.closePath();
+        armShape.quadraticCurveTo(-topWidth / 2, armHeight * 0.6, -bottomWidth / 2, 0);
 
         const armGeo = new THREE.ExtrudeGeometry(armShape, {
           depth: armDepth,
           bevelEnabled: false
         });
-        // Flush with plate back
         armGeo.translate(0, connLocalBottom, plateBackZ);
         const armMesh = new THREE.Mesh(armGeo, material.clone());
         group.add(armMesh);
       }
 
-      // --- Part 2: Round cylindrical bail through the chain loop ---
-      // Runs along Z axis so pendant can rotate freely
       const bailLength = plateThickness + 2;
       const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 16);
-      // CylinderGeometry default axis is Y; rotate to Z axis
       bailGeo.rotateX(Math.PI / 2);
       const bailY = connLocalBottom + connHeight - bailRadius;
       bailGeo.translate(0, bailY, plateBackZ + plateThickness / 2);
