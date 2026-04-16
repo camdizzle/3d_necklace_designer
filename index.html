@@ -304,6 +304,152 @@
       transform: translateY(0);
     }
 
+    #order-btn {
+      margin: 4px 20px 8px;
+      padding: 14px;
+      background: linear-gradient(135deg, #e94560, #c0392b);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    #order-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(233, 69, 96, 0.3);
+    }
+
+    #order-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Order modal */
+    .order-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0,0,0,0.6);
+    }
+
+    .order-modal.open { display: flex; }
+
+    .order-modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .order-modal-card h2 {
+      color: var(--gold);
+      font-size: 18px;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .order-modal-card p {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .order-modal-price {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      margin: 16px 0;
+    }
+
+    .order-modal-price span {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-dim);
+    }
+
+    .order-modal-details {
+      text-align: left;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 12px 0 16px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+    }
+
+    .order-modal-details strong {
+      color: var(--text);
+    }
+
+    .order-modal-go {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #e94560, #c0392b);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .order-modal-go:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    .order-modal-cancel {
+      margin-top: 10px;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    /* Order success/cancel toast */
+    .order-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      z-index: 300;
+      animation: toast-in 0.3s ease;
+    }
+
+    .order-toast.success {
+      background: #166534;
+      color: #bbf7d0;
+      border: 1px solid #22c55e;
+    }
+
+    .order-toast.cancelled {
+      background: #7f1d1d;
+      color: #fecaca;
+      border: 1px solid #ef4444;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
     /* File input styling */
     .file-input-wrapper {
       position: relative;
@@ -1208,6 +1354,7 @@
       </div>
 
       <button id="export-btn">Export Model</button>
+      <button id="order-btn">Order This Chain</button>
 
       <div class="btn-row">
         <button class="btn-action" id="screenshot-btn">Screenshot</button>
@@ -1229,6 +1376,19 @@
       </div>
       <div id="dimensions-display"></div>
       <div id="viewport-hint">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</div>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div class="order-modal" id="order-modal">
+    <div class="order-modal-card">
+      <h2>Order Your Custom Chain</h2>
+      <p>We'll 3D print your exact design and ship it to you.</p>
+      <div class="order-modal-price">$29.99 <span>+ free shipping</span></div>
+      <div class="order-modal-details" id="order-modal-details"></div>
+      <button class="order-modal-go" id="order-modal-go">Proceed to Checkout</button>
+      <br>
+      <button class="order-modal-cancel" id="order-modal-cancel">Cancel</button>
     </div>
   </div>
 

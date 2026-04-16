@@ -3,6 +3,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { createScene } from './scene.js';
 import { loadChain, updateChainMaterial } from './chainLoader.js';
 import { generatePendant, updateMaterialOnGroup, createMaterial } from './pendantGenerator.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { exportByFormat, takeScreenshot, computeDimensions } from './exporter.js';
 import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
@@ -17,6 +18,11 @@ const resetBtn = document.getElementById('reset-btn');
 const savePresetBtn = document.getElementById('save-preset-btn');
 const loadPresetBtn = document.getElementById('load-preset-btn');
 const dimensionsEl = document.getElementById('dimensions-display');
+const orderBtn = document.getElementById('order-btn');
+const orderModal = document.getElementById('order-modal');
+const orderModalDetails = document.getElementById('order-modal-details');
+const orderModalGo = document.getElementById('order-modal-go');
+const orderModalCancel = document.getElementById('order-modal-cancel');
 
 const { scene, camera, renderer, controls } = createScene(viewport);
 
@@ -290,6 +296,118 @@ if (screenshotBtn) {
   screenshotBtn.addEventListener('click', () => {
     takeScreenshot(renderer, scene, camera, { watermark: !isPro() });
   });
+}
+
+// Order This Chain — opens modal, then sends to Stripe Checkout
+if (orderBtn) {
+  orderBtn.addEventListener('click', () => {
+    // Build design summary for the modal
+    const lines = [state.text, state.secondLineText, state.thirdLineText].filter(Boolean);
+    const designName = lines.join(' / ') || 'Custom Chain';
+    const details = [
+      `Text: ${lines.join(', ') || 'none'}`,
+      `Shape: ${state.pendantShape}`,
+      `Material: ${state.material}`,
+      `Font: ${state.font}`
+    ].join('\n');
+
+    orderModalDetails.innerHTML =
+      `<strong>Design:</strong> ${designName}<br>` +
+      `<strong>Shape:</strong> ${state.pendantShape}<br>` +
+      `<strong>Material look:</strong> ${state.material}` +
+      (state.twoTone ? ` / chain: ${state.chainMaterial}` : '') + `<br>` +
+      `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${state.material}-tone finish.`;
+
+    orderModal.classList.add('open');
+
+    // Wire the go button (re-wire each time to capture current state)
+    const goHandler = async () => {
+      orderModalGo.disabled = true;
+      orderModalGo.textContent = 'PREPARING...';
+
+      try {
+        // Capture the scene as binary STL
+        scene.updateMatrixWorld(true);
+        const exporter = new STLExporter();
+        const stlBuffer = exporter.parse(scene, { binary: true });
+
+        // Convert ArrayBuffer to base64
+        const bytes = new Uint8Array(stlBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const stlBase64 = btoa(binary);
+
+        // Send to backend
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stlBase64,
+            designName,
+            designDetails: details,
+            priceInCents: 2999
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Server error' }));
+          throw new Error(err.error || 'Checkout failed');
+        }
+
+        const { url } = await res.json();
+        // Redirect to Stripe Checkout
+        window.location.href = url;
+      } catch (err) {
+        console.error('Order failed:', err);
+        alert('Failed to start checkout: ' + err.message);
+        orderModalGo.disabled = false;
+        orderModalGo.textContent = 'PROCEED TO CHECKOUT';
+      }
+
+      orderModalGo.removeEventListener('click', goHandler);
+    };
+
+    // Clean up any previous handler
+    orderModalGo.disabled = false;
+    orderModalGo.textContent = 'PROCEED TO CHECKOUT';
+    orderModalGo.addEventListener('click', goHandler, { once: true });
+  });
+}
+
+if (orderModalCancel) {
+  orderModalCancel.addEventListener('click', () => {
+    orderModal.classList.remove('open');
+  });
+}
+
+// Close order modal on backdrop click
+if (orderModal) {
+  orderModal.addEventListener('click', (e) => {
+    if (e.target === orderModal) orderModal.classList.remove('open');
+  });
+}
+
+// Handle order success/cancel URL params (redirect back from Stripe)
+{
+  const params = new URLSearchParams(window.location.search);
+  const orderStatus = params.get('order');
+  if (orderStatus === 'success' || orderStatus === 'cancelled') {
+    // Clean the URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('order');
+    window.history.replaceState({}, '', url.toString());
+
+    // Show toast
+    const toast = document.createElement('div');
+    toast.className = `order-toast ${orderStatus}`;
+    toast.textContent = orderStatus === 'success'
+      ? 'Order placed! Check your email for confirmation.'
+      : 'Order cancelled. Your design is still here whenever you\'re ready.';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
+  }
 }
 
 // Reset
