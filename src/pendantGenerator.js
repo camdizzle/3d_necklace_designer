@@ -317,7 +317,10 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     customShapePoints = null,
     reliefData = null,
     reliefHeight = 3,
-    customSTLGeometry = null
+    customSTLGeometry = null,
+    lineColor1 = null,
+    lineColor2 = null,
+    lineColor3 = null
   } = params;
 
   // Custom STL replaces the entire plate+text pendant
@@ -386,10 +389,22 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const connHeight = connLocalTop - connLocalBottom;
 
       if (connHeight > 0) {
-        const connWidth = chainThickness * 0.5;
-        const connDepth = stlD + 1;
-        const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
-        connGeo.translate(0, connLocalBottom + connHeight / 2, stlMidZ);
+        const bottomWidth = chainThickness * 0.4;
+        const topWidth = chainThickness * 0.25;
+        const connDepth = stlD;
+
+        const connShape = new THREE.Shape();
+        connShape.moveTo(-bottomWidth / 2, 0);
+        connShape.lineTo(bottomWidth / 2, 0);
+        connShape.lineTo(topWidth / 2, connHeight);
+        connShape.lineTo(-topWidth / 2, connHeight);
+        connShape.closePath();
+
+        const connGeo = new THREE.ExtrudeGeometry(connShape, {
+          depth: connDepth,
+          bevelEnabled: false
+        });
+        connGeo.translate(0, connLocalBottom, stlMidZ - connDepth / 2);
         const connMesh = new THREE.Mesh(connGeo, material.clone());
         group.add(connMesh);
       }
@@ -413,13 +428,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   }
 
   // Build lines array: each line has text, font key, size, curve, offsets
+  const lineColors = [lineColor1, lineColor2, lineColor3];
   const lines = [];
   if (text && text.trim().length > 0) {
     lines.push({
       text: text.trim(), fontKey, size: textSize, curve: textCurve,
       offsetX: textOffsetX, offsetY: textOffsetY,
       letterSpacing, extrudeDepth, bevelEnabled,
-      alignToPlate
+      alignToPlate, color: lineColor1
     });
   }
   if (secondLineText && secondLineText.trim().length > 0) {
@@ -427,7 +443,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       text: secondLineText.trim(), fontKey: secondLineFont, size: secondLineSize, curve: secondLineCurve,
       offsetX: secondLineOffsetX, offsetY: secondLineOffsetY,
       letterSpacing: secondLineLetterSpacing, extrudeDepth: secondLineExtrudeDepth, bevelEnabled: secondLineBevelEnabled,
-      alignToPlate: secondLineAlignToPlate
+      alignToPlate: secondLineAlignToPlate, color: lineColor2
     });
   }
   if (thirdLineText && thirdLineText.trim().length > 0) {
@@ -435,7 +451,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       text: thirdLineText.trim(), fontKey: thirdLineFont, size: thirdLineSize, curve: thirdLineCurve,
       offsetX: thirdLineOffsetX, offsetY: thirdLineOffsetY,
       letterSpacing: thirdLineLetterSpacing, extrudeDepth: thirdLineExtrudeDepth, bevelEnabled: thirdLineBevelEnabled,
-      alignToPlate: thirdLineAlignToPlate
+      alignToPlate: thirdLineAlignToPlate, color: lineColor3
     });
   }
 
@@ -467,9 +483,13 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
       const effectiveCurve = line.alignToPlate ? 0 : line.curve;
       const usePerChar = line.letterSpacing !== 0 || effectiveCurve !== 0;
+      // Per-line color: if set, create a custom material for this line
+      const lineMat = line.color
+        ? createMaterial(materialOpts.key || 'gold', { ...materialOpts, useCustomColor: true, customColor: line.color })
+        : material;
       const result = usePerChar
-        ? createCharacterMeshes(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, line.letterSpacing, effectiveCurve, material, renderOpts)
-        : createSingleTextMesh(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, material.clone(), renderOpts);
+        ? createCharacterMeshes(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, line.letterSpacing, effectiveCurve, lineMat, renderOpts)
+        : createSingleTextMesh(displayText, font, line.size, line.extrudeDepth, line.bevelEnabled, lineMat.clone(), renderOpts);
       lineResults.push({
         ...result,
         lineSize: line.size,
@@ -534,9 +554,12 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
           }
         });
 
+        const reLineMat = line.color
+          ? createMaterial(materialOpts.key || 'gold', { ...materialOpts, useCustomColor: true, customColor: line.color })
+          : material;
         const newResult = createCharacterMeshes(
           lr.displayText, lr.font, line.size, line.extrudeDepth, line.bevelEnabled,
-          line.letterSpacing, curveValue, material, lr.renderOpts
+          line.letterSpacing, curveValue, reLineMat, lr.renderOpts
         );
 
         lineResults[i] = {
@@ -693,10 +716,23 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const connHeight = connLocalTop - connLocalBottom;
 
     if (connHeight > 0) {
-      const connWidth = chainThickness * 0.5;
-      const connDepth = plateThickness + 1;
-      const connGeo = new THREE.BoxGeometry(connWidth, connHeight, connDepth);
-      connGeo.translate(0, connLocalBottom + connHeight / 2, plateMidZ);
+      // Tapered connector: wider at plate, narrower at chain for strength + aesthetics
+      const bottomWidth = chainThickness * 0.4;  // width where it meets the plate
+      const topWidth = chainThickness * 0.25;     // width where it meets the chain
+      const connDepth = plateThickness;
+
+      const connShape = new THREE.Shape();
+      connShape.moveTo(-bottomWidth / 2, 0);
+      connShape.lineTo(bottomWidth / 2, 0);
+      connShape.lineTo(topWidth / 2, connHeight);
+      connShape.lineTo(-topWidth / 2, connHeight);
+      connShape.closePath();
+
+      const connGeo = new THREE.ExtrudeGeometry(connShape, {
+        depth: connDepth,
+        bevelEnabled: false
+      });
+      connGeo.translate(0, connLocalBottom, plateMidZ - connDepth / 2);
       const connMesh = new THREE.Mesh(connGeo, material.clone());
       group.add(connMesh);
     }

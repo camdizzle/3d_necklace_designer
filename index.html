@@ -854,6 +854,16 @@
           </select>
         </div>
         <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="line1-color-toggle">
+            <label for="line1-color-toggle">Custom Color</label>
+          </div>
+          <div class="color-row" id="line1-color-row" style="display:none">
+            <input type="color" id="line1-color" value="#FFD700">
+            <span style="font-size:11px;color:var(--text-dim)">Text color for Line 1</span>
+          </div>
+        </div>
+        <div class="control-group">
           <label>Size</label>
           <div class="slider-row">
             <input type="range" id="text-size" min="2" max="50" value="24" step="0.5">
@@ -940,6 +950,16 @@
           </select>
         </div>
         <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="line2-color-toggle">
+            <label for="line2-color-toggle">Custom Color</label>
+          </div>
+          <div class="color-row" id="line2-color-row" style="display:none">
+            <input type="color" id="line2-color" value="#FFD700">
+            <span style="font-size:11px;color:var(--text-dim)">Text color for Line 2</span>
+          </div>
+        </div>
+        <div class="control-group">
           <label>Size</label>
           <div class="slider-row">
             <input type="range" id="second-line-size" min="2" max="40" value="16" step="0.5">
@@ -1024,6 +1044,16 @@
             <option value="alex_brush">Alex Brush ✦</option>
             <option value="kaushan_script">Kaushan Script ✦</option>
           </select>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="line3-color-toggle">
+            <label for="line3-color-toggle">Custom Color</label>
+          </div>
+          <div class="color-row" id="line3-color-row" style="display:none">
+            <input type="color" id="line3-color" value="#FFD700">
+            <span style="font-size:11px;color:var(--text-dim)">Text color for Line 3</span>
+          </div>
         </div>
         <div class="control-group">
           <label>Size</label>
@@ -1130,11 +1160,6 @@
             <input type="file" id="svg-import" accept=".svg">
           </div>
         </div>
-      </div>
-
-      <!-- Import Models -->
-      <div class="section">
-        <div class="section-title">Import</div>
         <div class="control-group">
           <label>Import STL as Pendant</label>
           <div class="file-input-wrapper">
@@ -1190,9 +1215,9 @@
         </div>
       </div>
 
-      <!-- Backing Plate -->
+      <!-- Pendant (merged Backing Plate + Pendant Adjust) -->
       <div class="section">
-        <div class="section-title">Backing Plate</div>
+        <div class="section-title">Pendant</div>
         <div class="control-group">
           <label>Padding</label>
           <div class="slider-row">
@@ -1210,8 +1235,8 @@
         <div class="control-group">
           <label>Plate Thickness</label>
           <div class="slider-row">
-            <input type="range" id="plate-thickness" min="1" max="10" value="4.5" step="0.5">
-            <span class="slider-value" id="plate-thickness-val">4.5</span>
+            <input type="range" id="plate-thickness" min="1" max="10" value="5.5" step="0.5">
+            <span class="slider-value" id="plate-thickness-val">5.5</span>
           </div>
         </div>
         <div class="control-group">
@@ -1221,11 +1246,6 @@
             <span class="slider-value" id="border-width-val">0</span>
           </div>
         </div>
-      </div>
-
-      <!-- Pendant Position -->
-      <div class="section">
-        <div class="section-title">Pendant Adjust</div>
         <div class="control-group">
           <label>Scale</label>
           <div class="slider-row">
@@ -1256,7 +1276,7 @@
         </div>
       </div>
 
-      <!-- Chain Settings -->
+      <!-- Chain -->
       <div class="section">
         <div class="section-title">Chain</div>
         <div class="control-group">
@@ -1274,10 +1294,11 @@
         </div>
       </div>
 
-      <!-- Pendant Material -->
+      <!-- Material & Color (consolidated) -->
       <div class="section">
-        <div class="section-title">Pendant Material</div>
-        <div class="control-presets">
+        <div class="section-title">Material & Color</div>
+        <div class="control-group">
+          <label style="margin-bottom:6px">Pendant Color</label>
           <div class="color-presets">
             <button class="color-btn gold active" data-color="gold">Gold</button>
             <button class="color-btn silver" data-color="silver">Silver</button>
@@ -1285,10 +1306,10 @@
             <button class="color-btn platinum" data-color="platinum">Platinum</button>
           </div>
         </div>
-        <div class="control-group" style="margin-top:10px">
+        <div class="control-group">
           <div class="checkbox-row">
             <input type="checkbox" id="use-custom-color">
-            <label for="use-custom-color">Custom Color</label>
+            <label for="use-custom-color">Custom Pendant Color</label>
           </div>
           <div class="color-row">
             <input type="color" id="custom-color" value="#FFD700">
@@ -1301,18 +1322,14 @@
             <label for="matte-toggle">Matte Finish</label>
           </div>
         </div>
-      </div>
-
-      <!-- Two-Tone Chain Material -->
-      <div class="section">
-        <div class="section-title">Two-Tone Chain</div>
         <div class="control-group">
           <div class="checkbox-row">
             <input type="checkbox" id="two-tone-toggle">
-            <label for="two-tone-toggle">Enable Two-Tone</label>
+            <label for="two-tone-toggle">Different Chain Color</label>
           </div>
         </div>
-        <div class="control-presets" style="margin-top:8px">
+        <div class="control-group" id="chain-color-group" style="display:none">
+          <label style="margin-bottom:6px">Chain Color</label>
           <div class="color-presets">
             <button class="color-btn chain-color-btn gold active" data-color="gold">Gold</button>
             <button class="color-btn chain-color-btn silver" data-color="silver">Silver</button>

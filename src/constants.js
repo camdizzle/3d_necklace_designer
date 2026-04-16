@@ -123,10 +123,15 @@ export const DEFAULTS = {
   bevelSize: 1,
   bevelSegments: 3,
 
+  // Per-line color (null = use pendant material)
+  lineColor1: null,
+  lineColor2: null,
+  lineColor3: null,
+
   // Plate
   platePadding: 8,
   plateRadius: 5,
-  plateThickness: 4.5,
+  plateThickness: 5.5,
   pendantShape: 'rectangle',
   engrave: false,
   borderWidth: 0,
