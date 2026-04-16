@@ -320,7 +320,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     customSTLGeometry = null,
     lineColor1 = null,
     lineColor2 = null,
-    lineColor3 = null
+    lineColor3 = null,
+    lockedPlateW = null,
+    lockedPlateH = null
   } = params;
 
   // Custom STL replaces the entire plate+text pendant
@@ -516,12 +518,12 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     }
   }
 
-  // Plate sizing: use text bounds if available, otherwise default size for image-only
+  // Plate sizing: use locked dimensions if set, otherwise compute from text bounds
   const defaultImageSize = 60;
   const contentW = hasText ? totalTextWidth : defaultImageSize;
   const contentH = hasText ? totalTextHeight : defaultImageSize;
-  const rawW = contentW + platePadding * 2;
-  const rawH = contentH + platePadding * 2;
+  const rawW = (lockedPlateW != null) ? lockedPlateW : contentW + platePadding * 2;
+  const rawH = (lockedPlateH != null) ? lockedPlateH : contentH + platePadding * 2;
   const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
     pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
   );
@@ -754,6 +756,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       group,
       width: plateW,
       height: plateH,
+      rawW,
+      rawH,
       pendantCenterY,
       defaultZ
     };
@@ -763,6 +767,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     group,
     width: plateW,
     height: plateH,
+    rawW,
+    rawH,
     pendantCenterY: 0,
     defaultZ: 0
   };

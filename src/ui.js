@@ -255,6 +255,7 @@ export function initUI(onChange) {
   gatePremiumCheckbox('engrave-toggle', FEATURES.engrave, 'engrave');
 
   // --- Plate ---
+  bindCheckbox('lock-pendant-size', 'lockPendantSize');
   bindSlider('plate-padding', 'platePadding', parseInt);
   bindSlider('plate-radius', 'plateRadius', parseInt);
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
@@ -427,6 +428,7 @@ export function initUI(onChange) {
     'second-line-align-to-plate-toggle': 'secondLineAlignToPlate',
     'third-line-align-to-plate-toggle': 'thirdLineAlignToPlate',
     'engrave-toggle': 'engrave',
+    'lock-pendant-size': 'lockPendantSize',
     'matte-toggle': 'matteFinish',
     'two-tone-toggle': 'twoTone',
     'hide-chain-toggle': 'hideChain',
