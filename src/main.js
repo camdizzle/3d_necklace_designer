@@ -160,7 +160,10 @@ async function rebuildPendant(state) {
     customShapePoints: state.customShapePoints,
     reliefData: state.reliefData,
     reliefHeight: state.reliefHeight,
-    customSTLGeometry: state.customSTLGeometry
+    customSTLGeometry: state.customSTLGeometry,
+    lineColor1: state.lineColor1,
+    lineColor2: state.lineColor2,
+    lineColor3: state.lineColor3
   }, getMaterialOpts(state), scaledChainInfo);
 
   if (!result) return;

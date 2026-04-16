@@ -174,6 +174,25 @@ export function initUI(onChange) {
     });
   }
 
+  function bindLineColor(toggleId, colorId, rowId, stateKey) {
+    const toggle = document.getElementById(toggleId);
+    const colorInput = document.getElementById(colorId);
+    const row = document.getElementById(rowId);
+    if (!toggle || !colorInput) return;
+
+    toggle.addEventListener('change', () => {
+      if (row) row.style.display = toggle.checked ? '' : 'none';
+      state[stateKey] = toggle.checked ? colorInput.value : null;
+      onChange(state, stateKey);
+    });
+
+    colorInput.addEventListener('input', () => {
+      if (!toggle.checked) return;
+      state[stateKey] = colorInput.value;
+      onChange(state, stateKey);
+    });
+  }
+
   // --- Line 1 ---
   const textInput = document.getElementById('text-input');
   let textDebounce;
@@ -196,6 +215,7 @@ export function initUI(onChange) {
   bindSlider('extrude-depth', 'extrudeDepth', parseFloat);
   bindCheckbox('bevel-toggle', 'bevelEnabled');
   bindCheckbox('align-to-plate-toggle', 'alignToPlate');
+  bindLineColor('line1-color-toggle', 'line1-color', 'line1-color-row', 'lineColor1');
 
   // --- Line 2 ---
   bindTextInput('second-line-input', 'secondLineText');
@@ -211,6 +231,7 @@ export function initUI(onChange) {
   bindSlider('second-line-extrude-depth', 'secondLineExtrudeDepth', parseFloat);
   bindCheckbox('second-line-bevel-toggle', 'secondLineBevelEnabled');
   bindCheckbox('second-line-align-to-plate-toggle', 'secondLineAlignToPlate');
+  bindLineColor('line2-color-toggle', 'line2-color', 'line2-color-row', 'lineColor2');
 
   // --- Line 3 ---
   bindTextInput('third-line-input', 'thirdLineText');
@@ -226,6 +247,7 @@ export function initUI(onChange) {
   bindSlider('third-line-extrude-depth', 'thirdLineExtrudeDepth', parseFloat);
   bindCheckbox('third-line-bevel-toggle', 'thirdLineBevelEnabled');
   bindCheckbox('third-line-align-to-plate-toggle', 'thirdLineAlignToPlate');
+  bindLineColor('line3-color-toggle', 'line3-color', 'line3-color-row', 'lineColor3');
 
   // --- Shared text layout ---
   bindSlider('line-spacing', 'lineSpacing', parseFloat);
@@ -294,6 +316,17 @@ export function initUI(onChange) {
   }
   bindCheckbox('matte-toggle', 'matteFinish');
   gatePremiumCheckbox('two-tone-toggle', FEATURES.twoTone, 'twoTone');
+
+  // Show/hide chain color group when two-tone is toggled
+  const chainColorGroup = document.getElementById('chain-color-group');
+  const twoToneToggle = document.getElementById('two-tone-toggle');
+  if (twoToneToggle && chainColorGroup) {
+    const syncChainGroup = () => {
+      chainColorGroup.style.display = twoToneToggle.checked ? '' : 'none';
+    };
+    twoToneToggle.addEventListener('change', syncChainGroup);
+    syncChainGroup();
+  }
 
   const bgColorInput = document.getElementById('bg-color');
   if (bgColorInput) {
@@ -440,6 +473,23 @@ export function initUI(onChange) {
     if (bgColorInput) bgColorInput.value = state.backgroundColor || DEFAULTS.backgroundColor;
     colorBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.material));
     chainMatBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.chainMaterial));
+
+    // Sync per-line color toggles
+    [['line1-color-toggle', 'line1-color', 'line1-color-row', 'lineColor1'],
+     ['line2-color-toggle', 'line2-color', 'line2-color-row', 'lineColor2'],
+     ['line3-color-toggle', 'line3-color', 'line3-color-row', 'lineColor3']
+    ].forEach(([toggleId, colorId, rowId, key]) => {
+      const toggle = document.getElementById(toggleId);
+      const colorInput = document.getElementById(colorId);
+      const row = document.getElementById(rowId);
+      if (toggle) toggle.checked = !!state[key];
+      if (colorInput && state[key]) colorInput.value = state[key];
+      if (row) row.style.display = state[key] ? '' : 'none';
+    });
+
+    // Sync chain color group visibility
+    const ccg = document.getElementById('chain-color-group');
+    if (ccg) ccg.style.display = state.twoTone ? '' : 'none';
   }
 
   // Reset
