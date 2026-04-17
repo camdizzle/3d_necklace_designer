@@ -150,31 +150,25 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
   }
 }
 
-function convexHull(points) {
-  if (points.length < 3) return points.slice();
-  points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const lower = [];
-  for (const p of points) {
-    while (lower.length >= 2) {
-      const a = lower[lower.length - 2], b = lower[lower.length - 1];
-      if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) <= 0) lower.pop();
-      else break;
+function smoothContour(points, iterations) {
+  let pts = points;
+  for (let iter = 0; iter < iterations; iter++) {
+    const smoothed = [];
+    for (let i = 0; i < pts.length; i++) {
+      const curr = pts[i];
+      const next = pts[(i + 1) % pts.length];
+      smoothed.push([
+        curr[0] * 0.75 + next[0] * 0.25,
+        curr[1] * 0.75 + next[1] * 0.25
+      ]);
+      smoothed.push([
+        curr[0] * 0.25 + next[0] * 0.75,
+        curr[1] * 0.25 + next[1] * 0.75
+      ]);
     }
-    lower.push(p);
+    pts = smoothed;
   }
-  const upper = [];
-  for (let i = points.length - 1; i >= 0; i--) {
-    const p = points[i];
-    while (upper.length >= 2) {
-      const a = upper[upper.length - 2], b = upper[upper.length - 1];
-      if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) <= 0) upper.pop();
-      else break;
-    }
-    upper.push(p);
-  }
-  lower.pop();
-  upper.pop();
-  return lower.concat(upper);
+  return pts;
 }
 
 function computeTextOutlineShape(lineResults, padding) {
@@ -196,42 +190,73 @@ function computeTextOutlineShape(lineResults, padding) {
 
   if (pts.length < 3) return null;
 
-  const hull = convexHull(pts);
-  if (hull.length < 3) return null;
-
-  // Offset hull outward by padding
-  const offset = [];
-  const n = hull.length;
-  for (let i = 0; i < n; i++) {
-    const prev = hull[(i - 1 + n) % n];
-    const curr = hull[i];
-    const next = hull[(i + 1) % n];
-    const nx = (next[1] - prev[1]);
-    const ny = -(next[0] - prev[0]);
-    const len = Math.sqrt(nx * nx + ny * ny) || 1;
-    offset.push([curr[0] + (nx / len) * padding, curr[1] + (ny / len) * padding]);
+  let minY = Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    minY = Math.min(minY, p[1]);
+    maxY = Math.max(maxY, p[1]);
   }
 
-  // Build smooth shape with rounded corners
+  const height = maxY - minY;
+  if (height < 0.1) return null;
+
+  const steps = 40;
+  const stepSize = height / steps;
+  const band = stepSize * 0.8;
+
+  const slices = [];
+  for (let i = 0; i <= steps; i++) {
+    const y = minY + i * stepSize;
+    let sliceMinX = Infinity, sliceMaxX = -Infinity;
+
+    for (const p of pts) {
+      if (Math.abs(p[1] - y) <= band) {
+        sliceMinX = Math.min(sliceMinX, p[0]);
+        sliceMaxX = Math.max(sliceMaxX, p[0]);
+      }
+    }
+
+    if (sliceMinX < Infinity) {
+      slices.push({ y, minX: sliceMinX, maxX: sliceMaxX });
+    }
+  }
+
+  if (slices.length < 2) return null;
+
+  const contour = [];
+
+  // Right side going up
+  for (const s of slices) {
+    contour.push([s.maxX + padding, s.y]);
+  }
+  // Top cap
+  const topY = slices[slices.length - 1].y + padding;
+  contour.push([slices[slices.length - 1].maxX + padding, topY]);
+  contour.push([slices[slices.length - 1].minX - padding, topY]);
+  // Left side going down
+  for (let i = slices.length - 1; i >= 0; i--) {
+    contour.push([slices[i].minX - padding, slices[i].y]);
+  }
+  // Bottom cap
+  const bottomY = slices[0].y - padding;
+  contour.push([slices[0].minX - padding, bottomY]);
+  contour.push([slices[0].maxX + padding, bottomY]);
+
+  const smoothed = smoothContour(contour, 3);
+
   const shape = new THREE.Shape();
-  const segments = 4;
-  for (let i = 0; i < offset.length; i++) {
-    const curr = offset[i];
-    const next = offset[(i + 1) % offset.length];
-    if (i === 0) shape.moveTo(curr[0], curr[1]);
-    const midX = (curr[0] + next[0]) / 2;
-    const midY = (curr[1] + next[1]) / 2;
-    shape.quadraticCurveTo(next[0], next[1], midX, midY);
+  shape.moveTo(smoothed[0][0], smoothed[0][1]);
+  for (let i = 1; i < smoothed.length; i++) {
+    shape.lineTo(smoothed[i][0], smoothed[i][1]);
   }
   shape.closePath();
 
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const p of offset) {
-    minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
-    minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+  let sMinX = Infinity, sMaxX = -Infinity, sMinY = Infinity, sMaxY = -Infinity;
+  for (const p of smoothed) {
+    sMinX = Math.min(sMinX, p[0]); sMaxX = Math.max(sMaxX, p[0]);
+    sMinY = Math.min(sMinY, p[1]); sMaxY = Math.max(sMaxY, p[1]);
   }
 
-  return { shape, w: maxX - minX, h: maxY - minY };
+  return { shape, w: sMaxX - sMinX, h: sMaxY - sMinY };
 }
 
 /**
