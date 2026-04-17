@@ -213,7 +213,7 @@ function computeTextOutlineShape(lineResults, padding) {
     contour.push([lb.minX - pad, lb.maxY]);
   }
 
-  const smoothed = smoothContour(contour, 4);
+  const smoothed = smoothContour(contour, 6);
 
   const shape = new THREE.Shape();
   shape.moveTo(smoothed[0][0], smoothed[0][1]);
