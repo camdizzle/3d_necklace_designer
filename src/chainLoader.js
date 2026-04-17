@@ -38,44 +38,59 @@ function findChainAttachPoint(geometry) {
   // inner loop top sits slightly off-center, making the pendant look offset.
   // We sample vertices near innerTopY and take their mean X as the true
   // attachment center so the caller can translate the chain to match.
-  const yTolerance = Math.max(2, maxGap * 0.05);
-  let xSum = 0, xCount = 0;
+  // Measure the full X extent of vertices inside the gap — this tells us
+  // how wide the connector opening actually is.
+  let xSum = 0, xCount = 0, gapXMin = Infinity, gapXMax = -Infinity;
   for (let i = 0; i < count; i++) {
+    const x = pos.getX(i);
     const y = pos.getY(i);
+    if (y > gapStart && y < gapEnd) {
+      gapXMin = Math.min(gapXMin, x);
+      gapXMax = Math.max(gapXMax, x);
+    }
+    const yTolerance = Math.max(2, maxGap * 0.05);
     if (Math.abs(y - gapEnd) < yTolerance) {
-      xSum += pos.getX(i);
+      xSum += x;
       xCount++;
     }
   }
   const attachX = xCount > 0 ? xSum / xCount : 0;
+  const gapXWidth = (gapXMax - gapXMin) || 30;
 
   return {
     attachPoint: new THREE.Vector3(attachX, gapEnd, 0),
     innerTopY: gapEnd,
     innerBottomY: gapStart,
-    attachX
+    attachX,
+    gapXWidth
   };
 }
 
-function removeBuiltInConnector(geometry, innerBottomY, innerTopY) {
+function removeBuiltInConnector(geometry, innerBottomY, innerTopY, gapXWidth) {
   const pos = geometry.attributes.position;
   const normal = geometry.attributes.normal;
   const triCount = pos.count / 3;
+
+  // Only remove triangles inside the gap Y range AND within the measured
+  // gap X width. Side chain links sit at the same Y range but are far
+  // from center X, so the X limit protects them.
+  const xLimit = gapXWidth * 0.6;
 
   const keepIndices = [];
 
   for (let t = 0; t < triCount; t++) {
     const i = t * 3;
     const ay = pos.getY(i), by = pos.getY(i + 1), cy = pos.getY(i + 2);
+    const ax = pos.getX(i), bx = pos.getX(i + 1), cx = pos.getX(i + 2);
 
-    // Remove any triangle where all 3 vertices sit strictly inside the gap.
-    // Chain link triangles straddle the gap boundary (at least one vertex
-    // outside), so they are preserved.
     const allInGap = ay > innerBottomY && ay < innerTopY &&
                      by > innerBottomY && by < innerTopY &&
                      cy > innerBottomY && cy < innerTopY;
+    const allNearCenter = Math.abs(ax) < xLimit &&
+                          Math.abs(bx) < xLimit &&
+                          Math.abs(cx) < xLimit;
 
-    if (!allInGap) {
+    if (!(allInGap && allNearCenter)) {
       keepIndices.push(i, i + 1, i + 2);
     }
   }
@@ -119,7 +134,7 @@ export function loadChain(materialKey = 'gold') {
           attach = findChainAttachPoint(geometry);
         }
 
-        const cleaned = removeBuiltInConnector(geometry, attach.innerBottomY, attach.innerTopY);
+        const cleaned = removeBuiltInConnector(geometry, attach.innerBottomY, attach.innerTopY, attach.gapXWidth);
 
         const mat = MATERIALS[materialKey];
         const material = new THREE.MeshStandardMaterial({
