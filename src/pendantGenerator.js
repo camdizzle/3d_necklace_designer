@@ -382,49 +382,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
     if (chainInfo) {
       const { innerTopY, chainThickness } = chainInfo;
-      const bevelClear = 1.0;
-      const bailRadius = chainThickness * 0.4;
-      const armMinHeight = 4;
-      const connGap = bailRadius * 2 + armMinHeight + bevelClear;
+      const connGap = chainThickness * 0.3;
       const pendantCenterY = innerTopY - pendantTop - connGap;
-
-      const connLocalBottom = pendantTop + bevelClear;
-      const connLocalTop = innerTopY - pendantCenterY;
-      const connHeight = connLocalTop - connLocalBottom;
-
-      if (connHeight > 0) {
-        const stlBackZ = stlMidZ - stlD / 2;
-        const armHeight = connHeight - bailRadius * 2;
-
-        if (armHeight > 0) {
-          const topWidth = bailRadius * 2;
-          const bottomWidth = Math.max(topWidth + 1, chainThickness * 0.9);
-          const armDepth = stlD;
-
-          const armShape = new THREE.Shape();
-          armShape.moveTo(-bottomWidth / 2, 0);
-          armShape.lineTo(bottomWidth / 2, 0);
-          armShape.quadraticCurveTo(bottomWidth * 0.3, armHeight * 0.5, topWidth / 2, armHeight);
-          armShape.lineTo(-topWidth / 2, armHeight);
-          armShape.quadraticCurveTo(-bottomWidth * 0.3, armHeight * 0.5, -bottomWidth / 2, 0);
-
-          const armGeo = new THREE.ExtrudeGeometry(armShape, {
-            depth: armDepth,
-            bevelEnabled: false
-          });
-          armGeo.translate(0, connLocalBottom, stlBackZ);
-          const armMesh = new THREE.Mesh(armGeo, material.clone());
-          group.add(armMesh);
-        }
-
-        const bailLength = stlD + 2;
-        const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 24);
-        bailGeo.rotateX(Math.PI / 2);
-        const bailY = connLocalBottom + connHeight - bailRadius;
-        bailGeo.translate(0, bailY, stlBackZ + stlD / 2);
-        const bailMesh = new THREE.Mesh(bailGeo, material.clone());
-        group.add(bailMesh);
-      }
 
       return {
         group,
@@ -729,54 +688,10 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   if (chainInfo) {
     const { innerTopY, chainThickness } = chainInfo;
 
-    // Clean connector bar from plate top to chain inner edge.
-    // Offset above bevel to prevent plate artifact.
-    const bevelClear = 1.0;
-    const bailRadius = chainThickness * 0.4;
-    const armMinHeight = 4;
-    const connGap = bailRadius * 2 + armMinHeight + bevelClear;
+    const connGap = chainThickness * 0.3;
     const pendantCenterY = innerTopY - pendantTop - connGap;
 
     const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
-
-    const connLocalBottom = pendantTop + bevelClear;
-    const connLocalTop = innerTopY - pendantCenterY;
-    const connHeight = connLocalTop - connLocalBottom;
-
-    if (connHeight > 0) {
-      const plateBackZ = -0.5;
-      const armHeight = connHeight - bailRadius * 2;
-
-      if (armHeight > 0) {
-        const topWidth = bailRadius * 2;
-        const bottomWidth = Math.max(topWidth + 1, chainThickness * 0.9);
-        const armDepth = plateThickness;
-
-        const armShape = new THREE.Shape();
-        armShape.moveTo(-bottomWidth / 2, 0);
-        armShape.lineTo(bottomWidth / 2, 0);
-        armShape.quadraticCurveTo(bottomWidth * 0.3, armHeight * 0.5, topWidth / 2, armHeight);
-        armShape.lineTo(-topWidth / 2, armHeight);
-        armShape.quadraticCurveTo(-bottomWidth * 0.3, armHeight * 0.5, -bottomWidth / 2, 0);
-
-        const armGeo = new THREE.ExtrudeGeometry(armShape, {
-          depth: armDepth,
-          bevelEnabled: false
-        });
-        armGeo.translate(0, connLocalBottom, plateBackZ);
-        const armMesh = new THREE.Mesh(armGeo, material.clone());
-        group.add(armMesh);
-      }
-
-      const bailLength = plateThickness + 2;
-      const bailGeo = new THREE.CylinderGeometry(bailRadius, bailRadius, bailLength, 24);
-      bailGeo.rotateX(Math.PI / 2);
-      const bailY = connLocalBottom + connHeight - bailRadius;
-      bailGeo.translate(0, bailY, plateBackZ + plateThickness / 2);
-      const bailMesh = new THREE.Mesh(bailGeo, material.clone());
-      group.add(bailMesh);
-    }
-
     const defaultZ = -plateMidZ;
 
     return {
