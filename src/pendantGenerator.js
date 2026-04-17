@@ -172,52 +172,76 @@ function smoothContour(points, iterations) {
 }
 
 function computeTextOutlineShape(lineResults, padding) {
-  const lineBounds = [];
+  const pts = [];
   for (const lr of lineResults) {
     lr.group.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(lr.group);
-    if (!box.isEmpty()) {
-      lineBounds.push({
-        minX: box.min.x, maxX: box.max.x,
-        minY: box.min.y, maxY: box.max.y
-      });
+    lr.group.traverse((child) => {
+      if (!child.isMesh) return;
+      const pos = child.geometry.attributes.position;
+      child.updateMatrixWorld(true);
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.set(pos.getX(i), pos.getY(i), 0);
+        child.localToWorld(v);
+        pts.push([v.x, v.y]);
+      }
+    });
+  }
+
+  if (pts.length < 3) return null;
+
+  let minY = Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    minY = Math.min(minY, p[1]);
+    maxY = Math.max(maxY, p[1]);
+  }
+
+  const height = maxY - minY;
+  if (height < 0.1) return null;
+
+  const steps = 20;
+  const stepSize = height / steps;
+  const band = stepSize;
+
+  const slices = [];
+  for (let i = 0; i <= steps; i++) {
+    const y = minY + i * stepSize;
+    let sliceMinX = Infinity, sliceMaxX = -Infinity;
+
+    for (const p of pts) {
+      if (Math.abs(p[1] - y) <= band) {
+        sliceMinX = Math.min(sliceMinX, p[0]);
+        sliceMaxX = Math.max(sliceMaxX, p[0]);
+      }
+    }
+
+    if (sliceMinX < Infinity) {
+      slices.push({ y, minX: sliceMinX, maxX: sliceMaxX });
     }
   }
 
-  if (lineBounds.length === 0) return null;
-  lineBounds.sort((a, b) => b.maxY - a.maxY);
-
-  const pad = padding;
-  const first = lineBounds[0];
-  const last = lineBounds[lineBounds.length - 1];
-  const topY = first.maxY + pad;
-  const bottomY = last.minY - pad;
+  if (slices.length < 2) return null;
 
   const contour = [];
 
-  // Top edge
-  contour.push([first.minX - pad, topY]);
-  contour.push([first.maxX + pad, topY]);
-
-  // Right side going down
-  for (let i = 0; i < lineBounds.length; i++) {
-    const lb = lineBounds[i];
-    contour.push([lb.maxX + pad, lb.maxY]);
-    contour.push([lb.maxX + pad, lb.minY]);
+  // Right side going up
+  for (const s of slices) {
+    contour.push([s.maxX + padding, s.y]);
   }
-
-  // Bottom edge
-  contour.push([last.maxX + pad, bottomY]);
-  contour.push([last.minX - pad, bottomY]);
-
-  // Left side going up
-  for (let i = lineBounds.length - 1; i >= 0; i--) {
-    const lb = lineBounds[i];
-    contour.push([lb.minX - pad, lb.minY]);
-    contour.push([lb.minX - pad, lb.maxY]);
+  // Top cap
+  const topY = slices[slices.length - 1].y + padding;
+  contour.push([slices[slices.length - 1].maxX + padding, topY]);
+  contour.push([slices[slices.length - 1].minX - padding, topY]);
+  // Left side going down
+  for (let i = slices.length - 1; i >= 0; i--) {
+    contour.push([slices[i].minX - padding, slices[i].y]);
   }
+  // Bottom cap
+  const bottomY = slices[0].y - padding;
+  contour.push([slices[0].minX - padding, bottomY]);
+  contour.push([slices[0].maxX + padding, bottomY]);
 
-  const smoothed = smoothContour(contour, 4);
+  const smoothed = smoothContour(contour, 2);
 
   const shape = new THREE.Shape();
   shape.moveTo(smoothed[0][0], smoothed[0][1]);
