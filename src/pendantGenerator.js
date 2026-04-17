@@ -187,7 +187,7 @@ function computeTextOutlineShape(lineResults, padding) {
   if (lineBounds.length === 0) return null;
   lineBounds.sort((a, b) => b.maxY - a.maxY);
 
-  const pad = padding * 0.6;
+  const pad = padding * 0.3;
   const first = lineBounds[0];
   const last = lineBounds[lineBounds.length - 1];
   const topY = first.maxY + pad;
@@ -213,7 +213,7 @@ function computeTextOutlineShape(lineResults, padding) {
     contour.push([lb.minX - pad, lb.maxY]);
   }
 
-  const smoothed = smoothContour(contour, 2);
+  const smoothed = smoothContour(contour, 4);
 
   const shape = new THREE.Shape();
   shape.moveTo(smoothed[0][0], smoothed[0][1]);
