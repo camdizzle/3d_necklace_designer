@@ -150,6 +150,90 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
   }
 }
 
+function convexHull(points) {
+  if (points.length < 3) return points.slice();
+  points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const lower = [];
+  for (const p of points) {
+    while (lower.length >= 2) {
+      const a = lower[lower.length - 2], b = lower[lower.length - 1];
+      if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) <= 0) lower.pop();
+      else break;
+    }
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    while (upper.length >= 2) {
+      const a = upper[upper.length - 2], b = upper[upper.length - 1];
+      if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) <= 0) upper.pop();
+      else break;
+    }
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function computeTextOutlineShape(lineResults, padding) {
+  const pts = [];
+  for (const lr of lineResults) {
+    lr.group.updateMatrixWorld(true);
+    lr.group.traverse((child) => {
+      if (!child.isMesh) return;
+      const pos = child.geometry.attributes.position;
+      child.updateMatrixWorld(true);
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.set(pos.getX(i), pos.getY(i), 0);
+        child.localToWorld(v);
+        pts.push([v.x, v.y]);
+      }
+    });
+  }
+
+  if (pts.length < 3) return null;
+
+  const hull = convexHull(pts);
+  if (hull.length < 3) return null;
+
+  // Offset hull outward by padding
+  const offset = [];
+  const n = hull.length;
+  for (let i = 0; i < n; i++) {
+    const prev = hull[(i - 1 + n) % n];
+    const curr = hull[i];
+    const next = hull[(i + 1) % n];
+    const nx = (next[1] - prev[1]);
+    const ny = -(next[0] - prev[0]);
+    const len = Math.sqrt(nx * nx + ny * ny) || 1;
+    offset.push([curr[0] + (nx / len) * padding, curr[1] + (ny / len) * padding]);
+  }
+
+  // Build smooth shape with rounded corners
+  const shape = new THREE.Shape();
+  const segments = 4;
+  for (let i = 0; i < offset.length; i++) {
+    const curr = offset[i];
+    const next = offset[(i + 1) % offset.length];
+    if (i === 0) shape.moveTo(curr[0], curr[1]);
+    const midX = (curr[0] + next[0]) / 2;
+    const midY = (curr[1] + next[1]) / 2;
+    shape.quadraticCurveTo(next[0], next[1], midX, midY);
+  }
+  shape.closePath();
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of offset) {
+    minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+    minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+  }
+
+  return { shape, w: maxX - minX, h: maxY - minY };
+}
+
 /**
  * Create text as individual character meshes for letter spacing and curve support.
  */
@@ -492,15 +576,42 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     }
   }
 
+  // Position text lines vertically (needed before plate creation for outline shape)
+  if (hasText) {
+    let cursorY = totalTextHeight / 2;
+    for (let i = 0; i < lineResults.length; i++) {
+      const lr = lineResults[i];
+      if (i > 0) cursorY -= lineResults[i - 1].lineSize * gapFactor;
+      cursorY -= lr.height / 2;
+      lr.group.position.x = lr.offsetX;
+      lr.group.position.y = cursorY + lr.offsetY;
+      cursorY -= lr.height / 2;
+      textGroup.add(lr.group);
+    }
+  }
+
   // Plate sizing: use locked dimensions if set, otherwise compute from text bounds
   const defaultImageSize = 60;
   const contentW = hasText ? totalTextWidth : defaultImageSize;
   const contentH = hasText ? totalTextHeight : defaultImageSize;
   const rawW = (lockedPlateW != null) ? lockedPlateW : contentW + platePadding * 2;
   const rawH = (lockedPlateH != null) ? lockedPlateH : contentH + platePadding * 2;
-  const { shape: plateShape, w: plateW, h: plateH } = createPlateShape(
-    pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
-  );
+
+  let plateShape, plateW, plateH;
+  if (pendantShape === 'outline' && hasText) {
+    const outlineResult = computeTextOutlineShape(lineResults, platePadding);
+    if (outlineResult) {
+      plateShape = outlineResult.shape;
+      plateW = outlineResult.w;
+      plateH = outlineResult.h;
+    } else {
+      ({ shape: plateShape, w: plateW, h: plateH } = createPlateShape('rectangle', rawW, rawH, plateRadius, customShapePoints));
+    }
+  } else {
+    ({ shape: plateShape, w: plateW, h: plateH } = createPlateShape(
+      pendantShape || 'rectangle', rawW, rawH, plateRadius, customShapePoints
+    ));
+  }
 
   if (hasText) {
     // Second pass: re-render alignToPlate lines with curve auto-computed from plate radius.
@@ -570,16 +681,17 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       }
     }
 
-    // Position lines top-to-bottom, centered vertically
-    let cursorY = totalTextHeight / 2;
-    for (let i = 0; i < lineResults.length; i++) {
-      const lr = lineResults[i];
-      if (i > 0) cursorY -= lineResults[i - 1].lineSize * gapFactor;
-      cursorY -= lr.height / 2;
-      lr.group.position.x = lr.offsetX;
-      lr.group.position.y = cursorY + lr.offsetY;
-      cursorY -= lr.height / 2;
-      textGroup.add(lr.group);
+    // Re-position lines after alignToPlate second pass (heights may have changed)
+    {
+      let cursorY = totalTextHeight / 2;
+      for (let i = 0; i < lineResults.length; i++) {
+        const lr = lineResults[i];
+        if (i > 0) cursorY -= lineResults[i - 1].lineSize * gapFactor;
+        cursorY -= lr.height / 2;
+        lr.group.position.x = lr.offsetX;
+        lr.group.position.y = cursorY + lr.offsetY;
+        cursorY -= lr.height / 2;
+      }
     }
 
     // Position each line on the plate surface, accounting for its own extrude depth.
