@@ -57,6 +57,57 @@ function findChainAttachPoint(geometry) {
   };
 }
 
+function removeBuiltInConnector(geometry, innerBottomY, innerTopY) {
+  const pos = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  const triCount = pos.count / 3;
+
+  const yMargin = (innerTopY - innerBottomY) * 0.05;
+  const yMin = innerBottomY + yMargin;
+  const yMax = innerTopY - yMargin;
+
+  const box = new THREE.Box3().setFromBufferAttribute(pos);
+  const chainWidth = box.max.x - box.min.x;
+  const xLimit = chainWidth * 0.15;
+
+  const keepIndices = [];
+
+  for (let t = 0; t < triCount; t++) {
+    const i = t * 3;
+    const ay = pos.getY(i), by = pos.getY(i + 1), cy = pos.getY(i + 2);
+    const ax = pos.getX(i), bx = pos.getX(i + 1), cx = pos.getX(i + 2);
+
+    const allInGap = ay > yMin && ay < yMax &&
+                     by > yMin && by < yMax &&
+                     cy > yMin && cy < yMax;
+    const allNearCenter = Math.abs(ax) < xLimit &&
+                          Math.abs(bx) < xLimit &&
+                          Math.abs(cx) < xLimit;
+
+    if (!(allInGap && allNearCenter)) {
+      keepIndices.push(i, i + 1, i + 2);
+    }
+  }
+
+  const newPos = new Float32Array(keepIndices.length * 3);
+  const newNorm = new Float32Array(keepIndices.length * 3);
+
+  for (let i = 0; i < keepIndices.length; i++) {
+    const src = keepIndices[i];
+    newPos[i * 3] = pos.getX(src);
+    newPos[i * 3 + 1] = pos.getY(src);
+    newPos[i * 3 + 2] = pos.getZ(src);
+    newNorm[i * 3] = normal.getX(src);
+    newNorm[i * 3 + 1] = normal.getY(src);
+    newNorm[i * 3 + 2] = normal.getZ(src);
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.BufferAttribute(newPos, 3));
+  newGeo.setAttribute('normal', new THREE.BufferAttribute(newNorm, 3));
+  return newGeo;
+}
+
 export function loadChain(materialKey = 'gold') {
   return new Promise((resolve, reject) => {
     const loader = new STLLoader();
@@ -77,6 +128,8 @@ export function loadChain(materialKey = 'gold') {
           attach = findChainAttachPoint(geometry);
         }
 
+        const cleaned = removeBuiltInConnector(geometry, attach.innerBottomY, attach.innerTopY);
+
         const mat = MATERIALS[materialKey];
         const material = new THREE.MeshStandardMaterial({
           color: mat.color,
@@ -85,14 +138,14 @@ export function loadChain(materialKey = 'gold') {
           envMapIntensity: mat.envMapIntensity
         });
 
-        const mesh = new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(cleaned, material);
 
-        const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+        const box = new THREE.Box3().setFromBufferAttribute(cleaned.attributes.position);
         const size = box.getSize(new THREE.Vector3());
 
         resolve({
           mesh,
-          geometry,
+          geometry: cleaned,
           size,
           attachPoint: attach.attachPoint,
           innerTopY: attach.innerTopY,
