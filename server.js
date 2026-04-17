@@ -56,9 +56,6 @@ app.use('/admin', adminRouter);
 // -------------------------------------------------------------------
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Also serve the chain STL from root (matches vite.config.js behavior)
-app.use('/ChainMakerChain.stl', express.static(path.join(__dirname, 'ChainMakerChain.stl')));
-
 // SPA fallback — any non-API, non-admin route serves index.html
 app.get('*', (req, res) => {
   // Don't intercept API or admin routes that fell through
