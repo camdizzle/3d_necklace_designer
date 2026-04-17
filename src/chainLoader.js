@@ -62,29 +62,20 @@ function removeBuiltInConnector(geometry, innerBottomY, innerTopY) {
   const normal = geometry.attributes.normal;
   const triCount = pos.count / 3;
 
-  const yMargin = (innerTopY - innerBottomY) * 0.05;
-  const yMin = innerBottomY + yMargin;
-  const yMax = innerTopY - yMargin;
-
-  const box = new THREE.Box3().setFromBufferAttribute(pos);
-  const chainWidth = box.max.x - box.min.x;
-  const xLimit = chainWidth * 0.15;
-
   const keepIndices = [];
 
   for (let t = 0; t < triCount; t++) {
     const i = t * 3;
     const ay = pos.getY(i), by = pos.getY(i + 1), cy = pos.getY(i + 2);
-    const ax = pos.getX(i), bx = pos.getX(i + 1), cx = pos.getX(i + 2);
 
-    const allInGap = ay > yMin && ay < yMax &&
-                     by > yMin && by < yMax &&
-                     cy > yMin && cy < yMax;
-    const allNearCenter = Math.abs(ax) < xLimit &&
-                          Math.abs(bx) < xLimit &&
-                          Math.abs(cx) < xLimit;
+    // Remove any triangle where all 3 vertices sit strictly inside the gap.
+    // Chain link triangles straddle the gap boundary (at least one vertex
+    // outside), so they are preserved.
+    const allInGap = ay > innerBottomY && ay < innerTopY &&
+                     by > innerBottomY && by < innerTopY &&
+                     cy > innerBottomY && cy < innerTopY;
 
-    if (!(allInGap && allNearCenter)) {
+    if (!allInGap) {
       keepIndices.push(i, i + 1, i + 2);
     }
   }

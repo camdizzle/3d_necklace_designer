@@ -383,7 +383,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     if (chainInfo) {
       const { innerTopY, chainThickness } = chainInfo;
       const bevelClear = 1.0;
-      const connGap = chainThickness * 0.3;
+      const bailRadius = chainThickness * 0.4;
+      const armMinHeight = 4;
+      const connGap = bailRadius * 2 + armMinHeight + bevelClear;
       const pendantCenterY = innerTopY - pendantTop - connGap;
 
       const connLocalBottom = pendantTop + bevelClear;
@@ -392,7 +394,6 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
       if (connHeight > 0) {
         const stlBackZ = stlMidZ - stlD / 2;
-        const bailRadius = chainThickness * 0.4;
         const armHeight = connHeight - bailRadius * 2;
 
         if (armHeight > 0) {
@@ -731,21 +732,19 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     // Clean connector bar from plate top to chain inner edge.
     // Offset above bevel to prevent plate artifact.
     const bevelClear = 1.0;
-    const connGap = chainThickness * 0.3;
+    const bailRadius = chainThickness * 0.4;
+    const armMinHeight = 4;
+    const connGap = bailRadius * 2 + armMinHeight + bevelClear;
     const pendantCenterY = innerTopY - pendantTop - connGap;
 
-    // Plate Z range: back at -0.5, front at plateThickness-0.5
     const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
 
-    // Connector from above plate bevel to chain inner edge
     const connLocalBottom = pendantTop + bevelClear;
     const connLocalTop = innerTopY - pendantCenterY;
     const connHeight = connLocalTop - connLocalBottom;
 
     if (connHeight > 0) {
       const plateBackZ = -0.5;
-
-      const bailRadius = chainThickness * 0.4;
       const armHeight = connHeight - bailRadius * 2;
 
       if (armHeight > 0) {
