@@ -23,6 +23,11 @@ const orderModal = document.getElementById('order-modal');
 const orderModalDetails = document.getElementById('order-modal-details');
 const orderModalGo = document.getElementById('order-modal-go');
 const orderModalCancel = document.getElementById('order-modal-cancel');
+const orderModalPrice = document.getElementById('order-modal-price');
+const orderQuantityInput = document.getElementById('order-quantity');
+const orderDiscountNote = document.getElementById('order-discount-note');
+const qtyMinus = document.getElementById('qty-minus');
+const qtyPlus = document.getElementById('qty-plus');
 
 const { scene, camera, renderer, controls } = createScene(viewport);
 
@@ -309,6 +314,49 @@ if (screenshotBtn) {
   });
 }
 
+// Order pricing: $25 each, buy 3 get 1 free (25% off every 4)
+const UNIT_PRICE = 2500; // cents
+
+function computeOrderPricing(qty) {
+  const freeItems = Math.floor(qty / 4);
+  const paidItems = qty - freeItems;
+  const totalCents = paidItems * UNIT_PRICE;
+  const fullPrice = qty * UNIT_PRICE;
+  const savings = fullPrice - totalCents;
+  return { totalCents, paidItems, freeItems, savings };
+}
+
+function updateOrderPriceDisplay() {
+  if (!orderQuantityInput || !orderModalPrice) return;
+  const qty = Math.max(1, parseInt(orderQuantityInput.value) || 1);
+  const { totalCents, freeItems, savings } = computeOrderPricing(qty);
+  const total = (totalCents / 100).toFixed(2);
+  orderModalPrice.innerHTML = `$${total} <span>+ free shipping</span>`;
+  if (freeItems > 0) {
+    orderDiscountNote.textContent = `Buy 3 get 1 free! ${freeItems} free chain${freeItems > 1 ? 's' : ''} — you save $${(savings / 100).toFixed(2)}`;
+  } else if (qty >= 2) {
+    orderDiscountNote.textContent = `Add ${4 - qty} more for a free chain!`;
+  } else {
+    orderDiscountNote.textContent = '';
+  }
+}
+
+if (qtyMinus) {
+  qtyMinus.addEventListener('click', () => {
+    const cur = parseInt(orderQuantityInput.value) || 1;
+    if (cur > 1) { orderQuantityInput.value = cur - 1; updateOrderPriceDisplay(); }
+  });
+}
+if (qtyPlus) {
+  qtyPlus.addEventListener('click', () => {
+    const cur = parseInt(orderQuantityInput.value) || 1;
+    if (cur < 99) { orderQuantityInput.value = cur + 1; updateOrderPriceDisplay(); }
+  });
+}
+if (orderQuantityInput) {
+  orderQuantityInput.addEventListener('input', updateOrderPriceDisplay);
+}
+
 // Order This Chain — opens modal, then sends to Stripe Checkout
 if (orderBtn) {
   orderBtn.addEventListener('click', () => {
@@ -321,6 +369,9 @@ if (orderBtn) {
       `Material: ${state.material}`,
       `Font: ${state.font}`
     ].join('\n');
+
+    if (orderQuantityInput) orderQuantityInput.value = 1;
+    updateOrderPriceDisplay();
 
     orderModalDetails.innerHTML =
       `<strong>Design:</strong> ${designName}<br>` +
@@ -335,6 +386,9 @@ if (orderBtn) {
     const goHandler = async () => {
       orderModalGo.disabled = true;
       orderModalGo.textContent = 'PREPARING...';
+
+      const qty = Math.max(1, parseInt(orderQuantityInput?.value) || 1);
+      const { totalCents } = computeOrderPricing(qty);
 
       try {
         // Capture the scene as binary STL
@@ -358,7 +412,8 @@ if (orderBtn) {
             stlBase64,
             designName,
             designDetails: details,
-            priceInCents: 2999
+            priceInCents: totalCents,
+            quantity: qty
           })
         });
 

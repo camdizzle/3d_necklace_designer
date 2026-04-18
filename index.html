@@ -391,6 +391,65 @@
       color: var(--text);
     }
 
+    .order-quantity-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 14px 0 4px;
+    }
+
+    .order-quantity-row label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .qty-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.2);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qty-btn:hover {
+      border-color: var(--gold);
+    }
+
+    #order-quantity {
+      width: 52px;
+      text-align: center;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.2);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      -moz-appearance: textfield;
+    }
+
+    #order-quantity::-webkit-inner-spin-button,
+    #order-quantity::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .order-discount-note {
+      font-size: 13px;
+      color: #22c55e;
+      font-weight: 600;
+      min-height: 18px;
+      margin-bottom: 4px;
+    }
+
     .order-modal-go {
       width: 100%;
       padding: 14px;
@@ -1408,7 +1467,14 @@
     <div class="order-modal-card">
       <h2>Order Your Custom Chain</h2>
       <p>We'll 3D print your exact design and ship it to you.</p>
-      <div class="order-modal-price">$29.99 <span>+ free shipping</span></div>
+      <div class="order-quantity-row">
+        <label for="order-quantity">Quantity:</label>
+        <button class="qty-btn" id="qty-minus">−</button>
+        <input type="number" id="order-quantity" value="1" min="1" max="99">
+        <button class="qty-btn" id="qty-plus">+</button>
+      </div>
+      <div class="order-modal-price" id="order-modal-price">$25.00 <span>+ free shipping</span></div>
+      <div class="order-discount-note" id="order-discount-note"></div>
       <div class="order-modal-details" id="order-modal-details"></div>
       <button class="order-modal-go" id="order-modal-go">Proceed to Checkout</button>
       <br>

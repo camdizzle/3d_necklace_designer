@@ -129,7 +129,7 @@ ordersRouter.post('/checkout', async (req, res) => {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { stlBase64, designName, designDetails, priceInCents } = req.body;
+  const { stlBase64, designName, designDetails, priceInCents, quantity } = req.body;
 
   if (!stlBase64) {
     return res.status(400).json({ error: 'Missing STL data' });
@@ -144,8 +144,8 @@ ordersRouter.post('/checkout', async (req, res) => {
   try {
     const stripe = new Stripe(stripeKey);
 
-    // Price: default $29.99 if frontend doesn't specify.
-    const unitAmount = priceInCents || 2999;
+    const unitAmount = priceInCents || 2500;
+    const qty = Math.max(1, parseInt(quantity) || 1);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -155,7 +155,7 @@ ordersRouter.post('/checkout', async (req, res) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Custom Chain: ${designName || 'My Design'}`,
+              name: `Custom Chain: ${designName || 'My Design'} (x${qty})`,
               description: designDetails || 'Custom 3D-printed pendant necklace'
             },
             unit_amount: unitAmount
@@ -169,7 +169,8 @@ ordersRouter.post('/checkout', async (req, res) => {
       metadata: {
         designName: designName || 'Custom Chain',
         designDetails: designDetails || '',
-        stlFile: tempName
+        stlFile: tempName,
+        quantity: String(qty)
       },
       success_url: `${baseUrl}/?order=success`,
       cancel_url: `${baseUrl}/?order=cancelled`
