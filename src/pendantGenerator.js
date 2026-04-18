@@ -172,75 +172,90 @@ function smoothContour(points, iterations) {
 }
 
 function computeTextOutlineShape(lineResults, padding) {
-  const lineBounds = [];
+  const allPoints = [];
   for (const lr of lineResults) {
     lr.group.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(lr.group);
-    if (!box.isEmpty()) {
-      lineBounds.push({
-        minX: box.min.x, maxX: box.max.x,
-        minY: box.min.y, maxY: box.max.y
-      });
-    }
+    lr.group.traverse((child) => {
+      if (child.isMesh && child.geometry) {
+        const pos = child.geometry.attributes.position;
+        const matrix = child.matrixWorld;
+        for (let i = 0; i < pos.count; i++) {
+          const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+          v.applyMatrix4(matrix);
+          allPoints.push([v.x, v.y]);
+        }
+      }
+    });
   }
 
-  if (lineBounds.length === 0) return null;
-  lineBounds.sort((a, b) => b.maxY - a.maxY);
+  if (allPoints.length === 0) return null;
+
+  let gMinY = Infinity, gMaxY = -Infinity;
+  for (const p of allPoints) {
+    gMinY = Math.min(gMinY, p[1]);
+    gMaxY = Math.max(gMaxY, p[1]);
+  }
+
+  const yRange = gMaxY - gMinY;
+  if (yRange < 0.01) return null;
 
   const pad = padding * 0.3;
-  const first = lineBounds[0];
-  const last = lineBounds[lineBounds.length - 1];
-  const topY = first.maxY + pad;
-  const bottomY = last.minY - pad;
+  const numBins = 60;
+  const binSize = yRange / numBins;
+
+  const bins = [];
+  for (let i = 0; i <= numBins; i++) {
+    bins.push({ minX: Infinity, maxX: -Infinity });
+  }
+
+  for (const p of allPoints) {
+    const idx = Math.max(0, Math.min(numBins, Math.round((p[1] - gMinY) / binSize)));
+    bins[idx].minX = Math.min(bins[idx].minX, p[0]);
+    bins[idx].maxX = Math.max(bins[idx].maxX, p[0]);
+  }
+
+  for (let i = 0; i <= numBins; i++) {
+    if (bins[i].minX === Infinity) {
+      let below = -1, above = -1;
+      for (let j = i - 1; j >= 0; j--) {
+        if (bins[j].minX !== Infinity) { below = j; break; }
+      }
+      for (let j = i + 1; j <= numBins; j++) {
+        if (bins[j].minX !== Infinity) { above = j; break; }
+      }
+      if (below >= 0 && above >= 0) {
+        const t = (i - below) / (above - below);
+        bins[i].minX = bins[below].minX + (bins[above].minX - bins[below].minX) * t;
+        bins[i].maxX = bins[below].maxX + (bins[above].maxX - bins[below].maxX) * t;
+      } else if (below >= 0) {
+        bins[i].minX = bins[below].minX;
+        bins[i].maxX = bins[below].maxX;
+      } else if (above >= 0) {
+        bins[i].minX = bins[above].minX;
+        bins[i].maxX = bins[above].maxX;
+      }
+    }
+  }
 
   const contour = [];
-  const taperSteps = 4;
+  const topY = gMaxY + pad;
+  const bottomY = gMinY - pad;
 
-  contour.push([first.minX - pad, topY]);
-  contour.push([first.maxX + pad, topY]);
+  contour.push([bins[numBins].minX - pad, topY]);
+  contour.push([bins[numBins].maxX + pad, topY]);
 
-  // Right side (top to bottom) with taper between lines
-  for (let i = 0; i < lineBounds.length; i++) {
-    const lb = lineBounds[i];
-    contour.push([lb.maxX + pad, lb.maxY]);
-    contour.push([lb.maxX + pad, lb.minY]);
-
-    if (i < lineBounds.length - 1) {
-      const next = lineBounds[i + 1];
-      const fromX = lb.maxX + pad;
-      const toX = next.maxX + pad;
-      const fromY = lb.minY;
-      const toY = next.maxY;
-      for (let s = 1; s <= taperSteps; s++) {
-        const t = s / (taperSteps + 1);
-        contour.push([fromX + (toX - fromX) * t, fromY + (toY - fromY) * t]);
-      }
-    }
+  for (let i = numBins; i >= 0; i--) {
+    contour.push([bins[i].maxX + pad, gMinY + i * binSize]);
   }
 
-  contour.push([last.maxX + pad, bottomY]);
-  contour.push([last.minX - pad, bottomY]);
+  contour.push([bins[0].maxX + pad, bottomY]);
+  contour.push([bins[0].minX - pad, bottomY]);
 
-  // Left side (bottom to top) with taper between lines
-  for (let i = lineBounds.length - 1; i >= 0; i--) {
-    const lb = lineBounds[i];
-    contour.push([lb.minX - pad, lb.minY]);
-    contour.push([lb.minX - pad, lb.maxY]);
-
-    if (i > 0) {
-      const prev = lineBounds[i - 1];
-      const fromX = lb.minX - pad;
-      const toX = prev.minX - pad;
-      const fromY = lb.maxY;
-      const toY = prev.minY;
-      for (let s = 1; s <= taperSteps; s++) {
-        const t = s / (taperSteps + 1);
-        contour.push([fromX + (toX - fromX) * t, fromY + (toY - fromY) * t]);
-      }
-    }
+  for (let i = 0; i <= numBins; i++) {
+    contour.push([bins[i].minX - pad, gMinY + i * binSize]);
   }
 
-  const smoothed = smoothContour(contour, 6);
+  const smoothed = smoothContour(contour, 4);
 
   const shape = new THREE.Shape();
   shape.moveTo(smoothed[0][0], smoothed[0][1]);
