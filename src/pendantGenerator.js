@@ -726,9 +726,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
     depth: plateThickness,
     bevelEnabled: true,
-    bevelThickness: 0.5,
-    bevelSize: 0.5,
-    bevelSegments: 2
+    bevelThickness: 1.5,
+    bevelSize: 1.5,
+    bevelSegments: 5
   });
   plateGeo.translate(0, 0, -0.5);
 
