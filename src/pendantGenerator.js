@@ -194,23 +194,50 @@ function computeTextOutlineShape(lineResults, padding) {
   const bottomY = last.minY - pad;
 
   const contour = [];
+  const taperSteps = 4;
 
   contour.push([first.minX - pad, topY]);
   contour.push([first.maxX + pad, topY]);
 
+  // Right side (top to bottom) with taper between lines
   for (let i = 0; i < lineBounds.length; i++) {
     const lb = lineBounds[i];
     contour.push([lb.maxX + pad, lb.maxY]);
     contour.push([lb.maxX + pad, lb.minY]);
+
+    if (i < lineBounds.length - 1) {
+      const next = lineBounds[i + 1];
+      const fromX = lb.maxX + pad;
+      const toX = next.maxX + pad;
+      const fromY = lb.minY;
+      const toY = next.maxY;
+      for (let s = 1; s <= taperSteps; s++) {
+        const t = s / (taperSteps + 1);
+        contour.push([fromX + (toX - fromX) * t, fromY + (toY - fromY) * t]);
+      }
+    }
   }
 
   contour.push([last.maxX + pad, bottomY]);
   contour.push([last.minX - pad, bottomY]);
 
+  // Left side (bottom to top) with taper between lines
   for (let i = lineBounds.length - 1; i >= 0; i--) {
     const lb = lineBounds[i];
     contour.push([lb.minX - pad, lb.minY]);
     contour.push([lb.minX - pad, lb.maxY]);
+
+    if (i > 0) {
+      const prev = lineBounds[i - 1];
+      const fromX = lb.minX - pad;
+      const toX = prev.minX - pad;
+      const fromY = lb.maxY;
+      const toY = prev.minY;
+      for (let s = 1; s <= taperSteps; s++) {
+        const t = s / (taperSteps + 1);
+        contour.push([fromX + (toX - fromX) * t, fromY + (toY - fromY) * t]);
+      }
+    }
   }
 
   const smoothed = smoothContour(contour, 6);
