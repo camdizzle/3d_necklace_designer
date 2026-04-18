@@ -38,6 +38,21 @@ function formatMoney(cents, currency = 'usd') {
   return `${symbol}${dollars}`;
 }
 
+function designDetailsBlock(details) {
+  if (!details) return '';
+  const lines = details.split('\n').filter(Boolean);
+  if (lines.length === 0) return '';
+  const rows = lines.map(line => {
+    const colorMatch = line.match(/\[color:\s*(#[0-9a-fA-F]{3,8})\]/);
+    let display = line.replace(/\[color:\s*#[0-9a-fA-F]{3,8}\]/, '').trim();
+    if (colorMatch) {
+      display += ` <span style="display:inline-block;width:14px;height:14px;background:${colorMatch[1]};border-radius:3px;vertical-align:middle;border:1px solid #ccc;"></span> ${colorMatch[1]}`;
+    }
+    return `<tr><td style="padding:4px 0;font-size:13px;">${display}</td></tr>`;
+  }).join('');
+  return `<table style="width:100%;margin:8px 0 12px;">${rows}</table>`;
+}
+
 function shippingBlock(shipping) {
   if (!shipping || !shipping.address) return '<p>No shipping address collected.</p>';
   const a = shipping.address;
@@ -74,10 +89,21 @@ export async function sendOrderConfirmation(order) {
             <td style="padding: 8px 0;">${order.designName}</td>
           </tr>
           <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px 0; color: #666;">Quantity</td>
+            <td style="padding: 8px 0;">${order.quantity || 1}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
             <td style="padding: 8px 0; color: #666;">Total</td>
             <td style="padding: 8px 0; font-weight: 600;">${formatMoney(order.amountTotal, order.currency)}</td>
           </tr>
         </table>
+
+        ${designDetailsBlock(order.designDetails)}
+
+        ${order.comments ? `<div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;margin:12px 0;">
+          <p style="margin:0 0 4px;font-size:12px;color:#666;text-transform:uppercase;font-weight:600;">Your Comments</p>
+          <p style="margin:0;font-size:14px;">${order.comments.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+        </div>` : ''}
 
         <h3 style="margin-bottom: 4px;">Shipping to:</h3>
         ${shippingBlock(order.shipping)}
@@ -106,8 +132,17 @@ export async function sendAdminNotification(order) {
       <h2>New Order: ${order.id}</h2>
       <p><strong>Customer:</strong> ${order.customerName} &lt;${order.customerEmail}&gt;</p>
       <p><strong>Design:</strong> ${order.designName}</p>
-      <p><strong>Details:</strong> ${order.designDetails || '—'}</p>
+      <p><strong>Quantity:</strong> ${order.quantity || 1}</p>
       <p><strong>Total:</strong> ${formatMoney(order.amountTotal, order.currency)}</p>
+
+      <h3>Design Details:</h3>
+      ${designDetailsBlock(order.designDetails) || `<p>${order.designDetails || '—'}</p>`}
+
+      ${order.comments ? `<h3>Customer Comments:</h3>
+      <div style="background:#fffbe6;border:1px solid #e6c200;border-radius:6px;padding:12px;margin:8px 0;">
+        <p style="margin:0;white-space:pre-wrap;">${order.comments.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+      </div>` : ''}
+
       <h3>Ship to:</h3>
       ${shippingBlock(order.shipping)}
       <p><a href="${baseUrl}/admin">Open admin dashboard</a></p>

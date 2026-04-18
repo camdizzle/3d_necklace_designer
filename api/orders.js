@@ -58,6 +58,8 @@ export function createOrder(data) {
     currency: data.currency || 'usd',
     designName: data.designName || 'Custom Chain',
     designDetails: data.designDetails || '',
+    quantity: data.quantity || 1,
+    comments: data.comments || '',
     trackingNumber: null,
     trackingCarrier: null,
     notes: ''
@@ -129,7 +131,7 @@ ordersRouter.post('/checkout', async (req, res) => {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { stlBase64, designName, designDetails, priceInCents, quantity } = req.body;
+  const { stlBase64, designName, designDetails, priceInCents, quantity, comments } = req.body;
 
   if (!stlBase64) {
     return res.status(400).json({ error: 'Missing STL data' });
@@ -170,7 +172,8 @@ ordersRouter.post('/checkout', async (req, res) => {
         designName: designName || 'Custom Chain',
         designDetails: designDetails || '',
         stlFile: tempName,
-        quantity: String(qty)
+        quantity: String(qty),
+        comments: (comments || '').slice(0, 500)
       },
       success_url: `${baseUrl}/?order=success`,
       cancel_url: `${baseUrl}/?order=cancelled`

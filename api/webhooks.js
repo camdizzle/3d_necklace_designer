@@ -57,7 +57,9 @@ webhookRouter.post('/stripe', async (req, res) => {
         currency: session.currency || 'usd',
         designName: session.metadata?.designName || 'Custom Chain',
         designDetails: session.metadata?.designDetails || '',
-        stlFile: session.metadata?.stlFile || null  // filename in orders/ dir
+        stlFile: session.metadata?.stlFile || null,
+        quantity: parseInt(session.metadata?.quantity) || 1,
+        comments: session.metadata?.comments || ''
       });
 
       console.log(`Order created: ${order.id} for ${order.customerEmail}`);

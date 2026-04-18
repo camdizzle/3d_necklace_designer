@@ -28,6 +28,7 @@ const orderQuantityInput = document.getElementById('order-quantity');
 const orderDiscountNote = document.getElementById('order-discount-note');
 const qtyMinus = document.getElementById('qty-minus');
 const qtyPlus = document.getElementById('qty-plus');
+const orderCommentsInput = document.getElementById('order-comments');
 
 const { scene, camera, renderer, controls } = createScene(viewport);
 
@@ -358,45 +359,74 @@ if (orderQuantityInput) {
 }
 
 // Order This Chain — opens modal, then sends to Stripe Checkout
+function buildDesignDetails(st) {
+  const lineEntries = [
+    { text: st.text, font: st.font, color: st.lineColor1 },
+    { text: st.secondLineText, font: st.secondLineFont, color: st.lineColor2 },
+    { text: st.thirdLineText, font: st.thirdLineFont, color: st.lineColor3 }
+  ];
+  const parts = [];
+  lineEntries.forEach((l, i) => {
+    if (!l.text) return;
+    let line = `Line ${i + 1}: "${l.text}" (${l.font})`;
+    if (l.color) line += ` [color: ${l.color}]`;
+    parts.push(line);
+  });
+  parts.push(`Shape: ${st.pendantShape}`);
+  parts.push(`Material: ${st.material}`);
+  if (st.twoTone) parts.push(`Chain material: ${st.chainMaterial}`);
+  if (st.matteFinish) parts.push('Finish: matte');
+  if (st.engrave) parts.push('Engraved text');
+  return parts.join('\n');
+}
+
 if (orderBtn) {
   orderBtn.addEventListener('click', () => {
-    // Build design summary for the modal
     const lines = [state.text, state.secondLineText, state.thirdLineText].filter(Boolean);
     const designName = lines.join(' / ') || 'Custom Chain';
-    const details = [
-      `Text: ${lines.join(', ') || 'none'}`,
-      `Shape: ${state.pendantShape}`,
-      `Material: ${state.material}`,
-      `Font: ${state.font}`
-    ].join('\n');
+    const details = buildDesignDetails(state);
 
     if (orderQuantityInput) orderQuantityInput.value = 1;
+    if (orderCommentsInput) orderCommentsInput.value = '';
     updateOrderPriceDisplay();
 
-    orderModalDetails.innerHTML =
+    let detailsHtml =
       `<strong>Design:</strong> ${designName}<br>` +
       `<strong>Shape:</strong> ${state.pendantShape}<br>` +
       `<strong>Material look:</strong> ${state.material}` +
-      (state.twoTone ? ` / chain: ${state.chainMaterial}` : '') + `<br>` +
-      `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${state.material}-tone finish.`;
+      (state.twoTone ? ` / chain: ${state.chainMaterial}` : '') + `<br>`;
 
+    const colorLabels = [
+      { text: state.text, color: state.lineColor1 },
+      { text: state.secondLineText, color: state.lineColor2 },
+      { text: state.thirdLineText, color: state.lineColor3 }
+    ].filter(e => e.text && e.color);
+
+    if (colorLabels.length > 0) {
+      detailsHtml += `<strong>Text colors:</strong> `;
+      detailsHtml += colorLabels.map(e =>
+        `"${e.text}" <span style="display:inline-block;width:12px;height:12px;background:${e.color};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${e.color}`
+      ).join(', ') + `<br>`;
+    }
+
+    detailsHtml += `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${state.material}-tone finish.`;
+
+    orderModalDetails.innerHTML = detailsHtml;
     orderModal.classList.add('open');
 
-    // Wire the go button (re-wire each time to capture current state)
     const goHandler = async () => {
       orderModalGo.disabled = true;
       orderModalGo.textContent = 'PREPARING...';
 
       const qty = Math.max(1, parseInt(orderQuantityInput?.value) || 1);
       const { totalCents } = computeOrderPricing(qty);
+      const comments = orderCommentsInput?.value?.trim() || '';
 
       try {
-        // Capture the scene as binary STL
         scene.updateMatrixWorld(true);
         const exporter = new STLExporter();
         const stlBuffer = exporter.parse(scene, { binary: true });
 
-        // Convert ArrayBuffer to base64
         const bytes = new Uint8Array(stlBuffer);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) {
@@ -404,7 +434,6 @@ if (orderBtn) {
         }
         const stlBase64 = btoa(binary);
 
-        // Send to backend
         const res = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -413,7 +442,8 @@ if (orderBtn) {
             designName,
             designDetails: details,
             priceInCents: totalCents,
-            quantity: qty
+            quantity: qty,
+            comments
           })
         });
 
@@ -423,7 +453,6 @@ if (orderBtn) {
         }
 
         const { url } = await res.json();
-        // Redirect to Stripe Checkout
         window.location.href = url;
       } catch (err) {
         console.error('Order failed:', err);
@@ -435,7 +464,6 @@ if (orderBtn) {
       orderModalGo.removeEventListener('click', goHandler);
     };
 
-    // Clean up any previous handler
     orderModalGo.disabled = false;
     orderModalGo.textContent = 'PROCEED TO CHECKOUT';
     orderModalGo.addEventListener('click', goHandler, { once: true });
