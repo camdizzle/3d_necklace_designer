@@ -501,12 +501,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const mesh = new THREE.Mesh(geo, material);
     group.add(mesh);
 
-    const pendantTop = stlH / 2;
+    // Anchor from top edge
+    const topShift = stlH / 2;
+    mesh.position.y -= topShift;
 
     if (chainInfo) {
       const { innerTopY, chainThickness } = chainInfo;
       const connGap = chainThickness * 0.3;
-      const pendantCenterY = innerTopY - pendantTop - connGap;
+      const pendantCenterY = innerTopY - connGap;
 
       return {
         group,
@@ -852,13 +854,19 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     group.add(reliefMesh);
   }
 
-  const pendantTop = plateH / 2;
+  // Anchor pendant from top edge: shift all children so group origin = plate top center.
+  // This way the pendant hangs downward from the connection point and resizing
+  // the plate doesn't affect the chain attachment.
+  const topShift = plateH / 2;
+  group.children.forEach(child => {
+    child.position.y -= topShift;
+  });
 
   if (chainInfo) {
     const { innerTopY, chainThickness } = chainInfo;
 
     const connGap = chainThickness * 0.3;
-    const pendantCenterY = innerTopY - pendantTop - connGap;
+    const pendantCenterY = innerTopY - connGap;
 
     const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
     const defaultZ = -plateMidZ;
