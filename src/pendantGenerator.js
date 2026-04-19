@@ -653,13 +653,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   }
 
   if (hasText) {
-    // Second pass: re-render alignToPlate lines with curve auto-computed from plate radius.
-    // Effective radius = inscribed radius minus half the padding so the text hugs the edge.
-    // Direction: first line curves positive (frown/top of plate), last line curves negative
-    // (smile/bottom of plate). Middle lines are left flat.
+    // Second pass: re-render alignToPlate lines with curve matching the plate edge.
+    // Uses elliptical curvature (a²/b) for a natural arc that follows the plate shape.
+    // Direction: first line curves positive (frown/top), last line curves negative (smile/bottom).
     const hasAlignToPlate = lines.some(l => l.alignToPlate);
     if (hasAlignToPlate) {
-      const effectiveRadius = Math.min(plateW, plateH) / 2 - platePadding * 0.5;
+      const a = plateW / 2;
+      const b = plateH / 2;
+      const effectiveRadius = b > 0 ? (a * a) / b : a;
       const computedCurve = effectiveRadius > 0 ? 300 / effectiveRadius : 0;
 
       for (let i = 0; i < lines.length; i++) {
@@ -678,7 +679,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         const line = lines[i];
         const lr = lineResults[i];
 
-        // Dispose old flat meshes before replacing
+        // Remove old group from scene and dispose its meshes
+        textGroup.remove(lr.group);
         lr.group.traverse((child) => {
           if (child.isMesh) {
             child.geometry.dispose();
@@ -699,6 +701,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
           });
         }
 
+        textGroup.add(newResult.group);
+
         lineResults[i] = {
           group: newResult.group,
           width: newResult.width,
@@ -708,7 +712,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
           offsetY: line.offsetY,
           font: lr.font,
           displayText: lr.displayText,
-          renderOpts: lr.renderOpts
+          renderOpts: lr.renderOpts,
+          alignSign: sign
         };
       }
 
@@ -730,6 +735,19 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         lr.group.position.x = lr.offsetX;
         lr.group.position.y = cursorY + lr.offsetY;
         cursorY -= lr.height / 2;
+      }
+    }
+
+    // Override Y position for alignToPlate lines to sit at the actual plate edge
+    for (let i = 0; i < lineResults.length; i++) {
+      const lr = lineResults[i];
+      if (!lr.alignSign) continue;
+
+      const box = new THREE.Box3().setFromObject(lr.group);
+      if (lr.alignSign > 0) {
+        lr.group.position.y += (plateH / 2 - platePadding) - box.max.y;
+      } else {
+        lr.group.position.y += (-plateH / 2 + platePadding) - box.min.y;
       }
     }
 
