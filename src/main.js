@@ -38,8 +38,12 @@ let chainInfo = null;
 let pendantGroup = null;
 let lastPendantCenterY = 0;
 let lastDefaultZ = 0;
+let lastPendantWidth = 0;
+let lastPendantHeight = 0;
 let silhouetteImageFile = null;
 let reliefImageFile = null;
+const fixedDiameterInput = document.getElementById('fixed-diameter');
+const clearFixedDiameterBtn = document.getElementById('clear-fixed-diameter');
 
 function getMaterialOpts(state) {
   return {
@@ -105,6 +109,19 @@ function updateDimensions() {
     dimensionsEl.style.display = 'block';
     dimensionsEl.textContent = `${dims.width} x ${dims.height} x ${dims.depth} mm`;
   }
+}
+
+function applyFixedDiameter(state) {
+  const diameter = parseFloat(fixedDiameterInput?.value);
+  if (!diameter || diameter <= 0 || lastPendantWidth <= 0) return;
+  const maxDim = Math.max(lastPendantWidth, lastPendantHeight);
+  if (maxDim <= 0) return;
+  const needed = diameter / maxDim;
+  state.pendantScale = Math.round(needed * 100) / 100;
+  const scaleSlider = document.getElementById('pendant-scale');
+  const scaleVal = document.getElementById('pendant-scale-val');
+  if (scaleSlider) scaleSlider.value = state.pendantScale;
+  if (scaleVal) scaleVal.textContent = state.pendantScale.toFixed(2);
 }
 
 function applyPendantTransform(state) {
@@ -198,7 +215,10 @@ async function rebuildPendant(state) {
   pendantGroup = result.group;
   lastPendantCenterY = result.pendantCenterY || 0;
   lastDefaultZ = result.defaultZ || 0;
+  lastPendantWidth = result.width || 0;
+  lastPendantHeight = result.height || 0;
 
+  applyFixedDiameter(state);
   applyPendantTransform(state);
 
   scene.add(pendantGroup);
@@ -318,6 +338,22 @@ exportBtn.addEventListener('click', () => {
 if (screenshotBtn) {
   screenshotBtn.addEventListener('click', () => {
     takeScreenshot(renderer, scene, camera, { watermark: !isPro() });
+  });
+}
+
+// Fixed diameter input
+if (fixedDiameterInput) {
+  fixedDiameterInput.addEventListener('change', async () => {
+    if (pendantGroup) {
+      applyFixedDiameter(state);
+      applyPendantTransform(state);
+      updateDimensions();
+    }
+  });
+}
+if (clearFixedDiameterBtn) {
+  clearFixedDiameterBtn.addEventListener('click', () => {
+    if (fixedDiameterInput) fixedDiameterInput.value = '';
   });
 }
 
