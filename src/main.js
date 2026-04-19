@@ -36,6 +36,8 @@ let chainMesh = null;
 let chainSize = null;
 let chainInfo = null;
 let pendantGroup = null;
+let lastPendantCenterY = 0;
+let lastDefaultZ = 0;
 let silhouetteImageFile = null;
 let reliefImageFile = null;
 
@@ -103,6 +105,17 @@ function updateDimensions() {
     dimensionsEl.style.display = 'block';
     dimensionsEl.textContent = `${dims.width} x ${dims.height} x ${dims.depth} mm`;
   }
+}
+
+function applyPendantTransform(state) {
+  if (!pendantGroup) return;
+  const ps = state.pendantScale;
+  pendantGroup.scale.setScalar(ps);
+  pendantGroup.position.set(
+    state.pendantOffsetX,
+    lastPendantCenterY + state.pendantOffsetY,
+    lastDefaultZ * ps + state.pendantOffsetZ
+  );
 }
 
 async function rebuildPendant(state) {
@@ -183,16 +196,10 @@ async function rebuildPendant(state) {
   }
 
   pendantGroup = result.group;
+  lastPendantCenterY = result.pendantCenterY || 0;
+  lastDefaultZ = result.defaultZ || 0;
 
-  const ps = state.pendantScale;
-  pendantGroup.scale.setScalar(ps);
-
-  const baseZ = result.defaultZ || 0;
-  pendantGroup.position.set(
-    state.pendantOffsetX,
-    result.pendantCenterY + state.pendantOffsetY,
-    baseZ + state.pendantOffsetZ
-  );
+  applyPendantTransform(state);
 
   scene.add(pendantGroup);
   updateDimensions();
@@ -229,11 +236,10 @@ const state = initUI(async (newState, changedKey) => {
     return;
   }
 
-  // Quick repositioning
+  // Quick repositioning — no rebuild needed, just update transform in-place
   if (['pendantOffsetX', 'pendantOffsetY', 'pendantOffsetZ', 'pendantScale'].includes(changedKey)) {
-    if (pendantGroup) {
-      await rebuildPendant(newState);
-    }
+    applyPendantTransform(newState);
+    updateDimensions();
     return;
   }
 
