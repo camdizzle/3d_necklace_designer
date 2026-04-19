@@ -656,15 +656,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
   if (hasText) {
     // Second pass: re-render alignToPlate lines with curve matching the plate edge.
-    // Uses elliptical curvature (a²/b) for a natural arc that follows the plate shape.
-    // Direction: first line curves positive (frown/top), last line curves negative (smile/bottom).
+    // First line curves positive (frown/top), last line curves negative (smile/bottom).
     const hasAlignToPlate = lines.some(l => l.alignToPlate);
     if (hasAlignToPlate) {
-      const a = plateW / 2;
-      const b = plateH / 2;
-      const effectiveRadius = b > 0 ? (a * a) / b : a;
-      const computedCurve = effectiveRadius > 0 ? 300 / effectiveRadius : 0;
-
       for (let i = 0; i < lines.length; i++) {
         if (!lines[i].alignToPlate) continue;
 
@@ -677,6 +671,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
         }
         if (sign === 0) continue;
 
+        // Curve radius = distance from plate center to text edge, clamped
+        // so the arc angle per side doesn't exceed ~45 degrees
+        const targetRadius = plateH / 2 - platePadding;
+        const maxAngle = Math.PI / 4;
+        const halfTextW = lineResults[i].width / 2;
+        const minRadius = halfTextW / maxAngle;
+        const effectiveRadius = Math.max(targetRadius, minRadius, 10);
+        const computedCurve = 300 / effectiveRadius;
         const curveValue = sign * computedCurve;
         const line = lines[i];
         const lr = lineResults[i];
@@ -800,7 +802,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   group.add(plateMesh);
   if (textGroup) group.add(textGroup);
 
-  // Border / frame
+  // Border / frame — front-facing only, back flush with plate back
   if (borderWidth > 0) {
     const borderOuter = createPlateShape(
       pendantShape || 'rectangle',
@@ -810,20 +812,21 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       customShapePoints
     );
 
-    // Create the inner hole from the plate shape
     const holePath = new THREE.Path();
     const platePoints = plateShape.getPoints(48);
     holePath.setFromPoints(platePoints);
     borderOuter.shape.holes.push(holePath);
 
+    const borderProtrusion = 2;
     const borderGeo = new THREE.ExtrudeGeometry(borderOuter.shape, {
-      depth: plateThickness + 1,
+      depth: borderProtrusion,
       bevelEnabled: true,
       bevelThickness: 0.3,
       bevelSize: 0.3,
       bevelSegments: 1
     });
-    borderGeo.translate(0, 0, -0.5);
+    // Start at plate front face so border only protrudes forward
+    borderGeo.translate(0, 0, plateThickness - 0.5);
 
     const borderMesh = new THREE.Mesh(borderGeo, material.clone());
     group.add(borderMesh);
@@ -854,10 +857,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     group.add(reliefMesh);
   }
 
-  // Anchor pendant from top edge: shift all children so group origin = plate top center.
-  // This way the pendant hangs downward from the connection point and resizing
-  // the plate doesn't affect the chain attachment.
-  const topShift = plateH / 2;
+  // Anchor pendant from top edge: shift all children so group origin = top center.
+  // Account for border extending above the plate.
+  const topShift = plateH / 2 + (borderWidth > 0 ? borderWidth : 0);
   group.children.forEach(child => {
     child.position.y -= topShift;
   });
