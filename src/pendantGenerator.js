@@ -818,23 +818,16 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     borderOuter.shape.holes.push(holePath);
 
     const borderProtrusion = 1.5;
+    const borderStart = plateThickness * 0.5 - 0.5;
+    const borderDepth = plateThickness * 0.5 + borderProtrusion;
     const borderGeo = new THREE.ExtrudeGeometry(borderOuter.shape, {
-      depth: plateThickness + borderProtrusion,
+      depth: borderDepth,
       bevelEnabled: true,
       bevelThickness: 0.3,
       bevelSize: 0.3,
       bevelSegments: 1
     });
-    borderGeo.translate(0, 0, -0.5);
-
-    // Flatten back: clamp any vertices behind the plate back so
-    // the border is flush at the back and only protrudes from the front
-    const bpos = borderGeo.attributes.position;
-    for (let i = 0; i < bpos.count; i++) {
-      if (bpos.getZ(i) < -0.5) bpos.setZ(i, -0.5);
-    }
-    bpos.needsUpdate = true;
-    borderGeo.computeVertexNormals();
+    borderGeo.translate(0, 0, borderStart);
 
     const borderMesh = new THREE.Mesh(borderGeo, material.clone());
     group.add(borderMesh);
