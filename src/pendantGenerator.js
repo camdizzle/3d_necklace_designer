@@ -875,7 +875,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   if (chainInfo) {
     const { innerTopY, chainThickness } = chainInfo;
 
-    const connGap = chainThickness * 0.3;
+    const connGap = 1.5;
     const pendantCenterY = innerTopY - connGap;
 
     const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
