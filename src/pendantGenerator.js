@@ -802,7 +802,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   group.add(plateMesh);
   if (textGroup) group.add(textGroup);
 
-  // Border / frame — front-facing only, back flush with plate back
+  // Border / frame — back flush with plate, protrudes forward
   if (borderWidth > 0) {
     const borderOuter = createPlateShape(
       pendantShape || 'rectangle',
@@ -817,16 +817,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     holePath.setFromPoints(platePoints);
     borderOuter.shape.holes.push(holePath);
 
-    const borderProtrusion = 2;
     const borderGeo = new THREE.ExtrudeGeometry(borderOuter.shape, {
-      depth: borderProtrusion,
+      depth: plateThickness + 1,
       bevelEnabled: true,
       bevelThickness: 0.3,
       bevelSize: 0.3,
       bevelSegments: 1
     });
-    // Start at plate front face so border only protrudes forward
-    borderGeo.translate(0, 0, plateThickness - 0.5);
+    borderGeo.translate(0, 0, -0.5);
 
     const borderMesh = new THREE.Mesh(borderGeo, material.clone());
     group.add(borderMesh);
