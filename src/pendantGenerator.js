@@ -802,7 +802,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   group.add(plateMesh);
   if (textGroup) group.add(textGroup);
 
-  // Border / frame — back flush with plate, protrudes forward
+  // Border / frame — sits on the plate front face, protrudes forward only
   if (borderWidth > 0) {
     const borderOuter = createPlateShape(
       pendantShape || 'rectangle',
@@ -817,17 +817,24 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     holePath.setFromPoints(platePoints);
     borderOuter.shape.holes.push(holePath);
 
-    const borderProtrusion = 1.5;
-    const borderStart = plateThickness * 0.5 - 0.5;
-    const borderDepth = plateThickness * 0.5 + borderProtrusion;
+    const borderProtrusion = 2.5;
     const borderGeo = new THREE.ExtrudeGeometry(borderOuter.shape, {
-      depth: borderDepth,
+      depth: borderProtrusion,
       bevelEnabled: true,
-      bevelThickness: 0.3,
-      bevelSize: 0.3,
-      bevelSegments: 1
+      bevelThickness: 0.5,
+      bevelSize: 0.5,
+      bevelSegments: 2
     });
-    borderGeo.translate(0, 0, borderStart);
+    const borderZ = plateThickness - 0.5;
+    borderGeo.translate(0, 0, borderZ);
+
+    // Remove back-face bevel so border sits flat against the plate front
+    const bpos = borderGeo.attributes.position;
+    for (let i = 0; i < bpos.count; i++) {
+      if (bpos.getZ(i) < borderZ) bpos.setZ(i, borderZ);
+    }
+    bpos.needsUpdate = true;
+    borderGeo.computeVertexNormals();
 
     const borderMesh = new THREE.Mesh(borderGeo, material.clone());
     group.add(borderMesh);
@@ -870,8 +877,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
     const pendantCenterY = innerTopY + bailHeight / 2;
 
-    const plateMidZ = (plateThickness - 0.5 + (-0.5)) / 2;
-    const defaultZ = -plateMidZ;
+    const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2.5 : plateThickness - 0.5;
+    const backZ = -0.5;
+    const defaultZ = -(frontZ + backZ) / 2;
 
     return {
       group,
