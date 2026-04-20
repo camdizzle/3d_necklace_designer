@@ -40,10 +40,31 @@ function findChainAttachPoint(geometry) {
   }
   const attachX = xCount > 0 ? xSum / xCount : 0;
 
+  // Detect bail height: scan vertices above gapEnd and find where
+  // vertex density jumps (bail → chain body transition).
+  const aboveGap = yVals.filter(y => y >= gapEnd);
+  const binSize = 2;
+  const bins = {};
+  aboveGap.forEach(y => {
+    const bin = Math.floor((y - gapEnd) / binSize);
+    bins[bin] = (bins[bin] || 0) + 1;
+  });
+  const binKeys = Object.keys(bins).map(Number).sort((a, b) => a - b);
+  let bailHeight = 10;
+  for (let i = 1; i < binKeys.length; i++) {
+    const prev = bins[binKeys[i - 1]] || 0;
+    const curr = bins[binKeys[i]] || 0;
+    if (curr > prev * 5 && curr > 500) {
+      bailHeight = binKeys[i] * binSize;
+      break;
+    }
+  }
+
   return {
     attachPoint: new THREE.Vector3(attachX, gapEnd, 0),
     innerTopY: gapEnd,
     innerBottomY: gapStart,
+    bailHeight,
     attachX
   };
 }
@@ -85,6 +106,7 @@ export function loadChain(materialKey = 'gold') {
           attachPoint: attach.attachPoint,
           innerTopY: attach.innerTopY,
           innerBottomY: attach.innerBottomY,
+          bailHeight: attach.bailHeight,
           chainThickness: size.z
         });
       },

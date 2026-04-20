@@ -74,6 +74,7 @@ async function init() {
     chainInfo = {
       innerTopY: chain.innerTopY,
       innerBottomY: chain.innerBottomY,
+      bailHeight: chain.bailHeight,
       chainThickness: chain.chainThickness
     };
     scene.add(chainMesh);
@@ -151,6 +152,7 @@ async function rebuildPendant(state) {
   const scaledChainInfo = chainInfo ? {
     innerTopY: chainInfo.innerTopY * scale,
     innerBottomY: chainInfo.innerBottomY * scale,
+    bailHeight: chainInfo.bailHeight * scale,
     chainThickness: chainInfo.chainThickness * scale
   } : null;
 
