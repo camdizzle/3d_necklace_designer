@@ -802,7 +802,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   group.add(plateMesh);
   if (textGroup) group.add(textGroup);
 
-  // Border / frame — sits on the plate front face, protrudes forward only
+  // Border / frame — full plate depth, flush at back, raised on front
   if (borderWidth > 0) {
     const borderOuter = createPlateShape(
       pendantShape || 'rectangle',
@@ -817,21 +817,20 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     holePath.setFromPoints(platePoints);
     borderOuter.shape.holes.push(holePath);
 
-    const borderProtrusion = 2.5;
+    const borderProtrusion = 2;
     const borderGeo = new THREE.ExtrudeGeometry(borderOuter.shape, {
-      depth: borderProtrusion,
+      depth: plateThickness + borderProtrusion,
       bevelEnabled: true,
       bevelThickness: 0.5,
       bevelSize: 0.5,
       bevelSegments: 2
     });
-    const borderZ = plateThickness - 0.5;
-    borderGeo.translate(0, 0, borderZ);
+    borderGeo.translate(0, 0, -0.5);
 
-    // Remove back-face bevel so border sits flat against the plate front
+    // Clamp back bevel flush with plate back (z = -0.5)
     const bpos = borderGeo.attributes.position;
     for (let i = 0; i < bpos.count; i++) {
-      if (bpos.getZ(i) < borderZ) bpos.setZ(i, borderZ);
+      if (bpos.getZ(i) < -0.5) bpos.setZ(i, -0.5);
     }
     bpos.needsUpdate = true;
     borderGeo.computeVertexNormals();
@@ -877,7 +876,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
     const pendantCenterY = innerTopY + bailHeight / 2;
 
-    const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2.5 : plateThickness - 0.5;
+    const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
     const backZ = -0.5;
     const defaultZ = -(frontZ + backZ) / 2;
 
