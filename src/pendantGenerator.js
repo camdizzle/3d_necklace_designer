@@ -796,6 +796,14 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   });
   plateGeo.translate(0, 0, -0.5);
 
+  // Flatten back: clamp plate vertices so the back face is perfectly flat
+  const ppos = plateGeo.attributes.position;
+  for (let i = 0; i < ppos.count; i++) {
+    if (ppos.getZ(i) < -0.5) ppos.setZ(i, -0.5);
+  }
+  ppos.needsUpdate = true;
+  plateGeo.computeVertexNormals();
+
   const plateMesh = new THREE.Mesh(plateGeo, material.clone());
   plateMesh.material.roughness = (materialOpts.matteFinish ? 0.7 : (MATERIALS[materialOpts.key]?.roughness || 0.25)) + 0.1;
 
