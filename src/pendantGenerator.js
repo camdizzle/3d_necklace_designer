@@ -912,7 +912,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   // Pendant ring (bail loop) — attached to top of plate for chain to pass through.
   // Skipped for cuban chain which connects directly.
   let ringHeight = 0;
-  if (chainType !== 'cuban') {
+  if (chainType !== 'cuban' && chainType !== 'twisted-star') {
     const ringRadius = 4;
     const tubeRadius = 1.2;
     const ringGeo = new THREE.TorusGeometry(ringRadius, tubeRadius, 12, 24);

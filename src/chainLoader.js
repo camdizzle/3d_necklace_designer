@@ -79,7 +79,6 @@ const CHAIN_MODELS = {
 };
 
 const CHAIN_ROTATIONS = {
-  'twisted-star': Math.PI / 2
 };
 
 export function loadChain(materialKey = 'gold', chainType = 'rope') {
