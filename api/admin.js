@@ -9,6 +9,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { listOrders, getOrder, updateOrder } from './orders.js';
 import { sendShippingNotification } from './email.js';
@@ -37,9 +38,14 @@ function requireAuth(req, res, next) {
   }
 
   const decoded = Buffer.from(header.slice(6), 'base64').toString();
-  const [u, p] = decoded.split(':');
+  const [u, ...pParts] = decoded.split(':');
+  const p = pParts.join(':'); // password may contain colons
 
-  if (u === user && p === pass) {
+  const valid = u.length === user.length && p.length === pass.length &&
+    crypto.timingSafeEqual(Buffer.from(u), Buffer.from(user)) &&
+    crypto.timingSafeEqual(Buffer.from(p), Buffer.from(pass));
+
+  if (valid) {
     return next();
   }
 
@@ -99,6 +105,10 @@ adminRouter.put('/api/orders/:id', async (req, res) => {
 
 // Download STL for an order
 adminRouter.get('/api/orders/:id/stl', (req, res) => {
+  // Validate order ID format to prevent path traversal
+  if (!/^[A-Za-z0-9-]+$/.test(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid order ID format' });
+  }
   const ordersDir = path.join(__dirname, '..', 'orders');
   const stl = path.join(ordersDir, `${req.params.id}.stl`);
   if (!fs.existsSync(stl)) {

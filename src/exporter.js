@@ -12,25 +12,28 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export function exportSTL(scene, filename = 'necklace.stl') {
-  scene.updateMatrixWorld(true);
+export function exportSTL(group, filename = 'necklace.stl') {
+  if (!group) { alert('No pendant to export.'); return; }
+  group.updateMatrixWorld(true);
   const exporter = new STLExporter();
-  const result = exporter.parse(scene, { binary: true });
+  const result = exporter.parse(group, { binary: true });
   downloadBlob(new Blob([result], { type: 'application/octet-stream' }), filename);
 }
 
-export function exportOBJ(scene, filename = 'necklace.obj') {
-  scene.updateMatrixWorld(true);
+export function exportOBJ(group, filename = 'necklace.obj') {
+  if (!group) { alert('No pendant to export.'); return; }
+  group.updateMatrixWorld(true);
   const exporter = new OBJExporter();
-  const result = exporter.parse(scene);
+  const result = exporter.parse(group);
   downloadBlob(new Blob([result], { type: 'text/plain' }), filename);
 }
 
-export function exportGLB(scene, filename = 'necklace.glb') {
-  scene.updateMatrixWorld(true);
+export function exportGLB(group, filename = 'necklace.glb') {
+  if (!group) { alert('No pendant to export.'); return; }
+  group.updateMatrixWorld(true);
   const exporter = new GLTFExporter();
   exporter.parse(
-    scene,
+    group,
     (result) => {
       downloadBlob(new Blob([result], { type: 'application/octet-stream' }), filename);
     },
@@ -41,16 +44,16 @@ export function exportGLB(scene, filename = 'necklace.glb') {
   );
 }
 
-export function exportByFormat(scene, baseName, format) {
+export function exportByFormat(group, baseName, format) {
   const name = baseName.toLowerCase().replace(/\s+/g, '_');
   switch (format) {
     case 'obj':
-      return exportOBJ(scene, `${name}_necklace.obj`);
+      return exportOBJ(group, `${name}_necklace.obj`);
     case 'glb':
-      return exportGLB(scene, `${name}_necklace.glb`);
+      return exportGLB(group, `${name}_necklace.glb`);
     case 'stl':
     default:
-      return exportSTL(scene, `${name}_necklace.stl`);
+      return exportSTL(group, `${name}_necklace.stl`);
   }
 }
 
@@ -103,8 +106,9 @@ function triggerDownload(dataURL, filename) {
   link.click();
 }
 
-export function computeDimensions(scene) {
-  const box = new THREE.Box3().setFromObject(scene);
+export function computeDimensions(group) {
+  if (!group) return null;
+  const box = new THREE.Box3().setFromObject(group);
   if (box.isEmpty()) return null;
   const size = box.getSize(new THREE.Vector3());
   return {

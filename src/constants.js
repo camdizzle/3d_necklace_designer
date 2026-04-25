@@ -93,7 +93,7 @@ export const DEFAULTS = {
   alignToPlate: false,
 
   // Line 2
-  secondLineText: 'Name',
+  secondLineText: '',
   secondLineFont: 'helvetiker_bold',
   secondLineSize: 16,
   secondLineCurve: 0,
@@ -105,7 +105,7 @@ export const DEFAULTS = {
   secondLineAlignToPlate: false,
 
   // Line 3
-  thirdLineText: 'Date',
+  thirdLineText: '',
   thirdLineFont: 'helvetiker_bold',
   thirdLineSize: 14,
   thirdLineCurve: 0,
@@ -147,6 +147,7 @@ export const DEFAULTS = {
   pendantOffsetZ: -2,
 
   // Chain
+  chainType: 'rope',
   chainScale: 1.0,
   hideChain: false,
 
@@ -161,6 +162,7 @@ export const DEFAULTS = {
   // Display
   backgroundColor: '#1a1a2e',
   showDimensions: true,
+  autoRotate: false,
 
   // Image features
   imageThreshold: 128,

@@ -294,6 +294,7 @@ export function initUI(onChange) {
   bindSlider('pendant-offset-z', 'pendantOffsetZ', parseFloat);
 
   // --- Chain ---
+  bindSelect('chain-type-select', 'chainType');
   bindSlider('chain-scale', 'chainScale', parseFloat);
   bindCheckbox('hide-chain-toggle', 'hideChain');
 
@@ -381,6 +382,7 @@ export function initUI(onChange) {
 
   // Display
   bindCheckbox('show-dimensions-toggle', 'showDimensions');
+  bindCheckbox('auto-rotate-toggle', 'autoRotate');
 
   // Export
   bindSelect('export-format', 'exportFormat');
@@ -433,6 +435,7 @@ export function initUI(onChange) {
     'two-tone-toggle': 'twoTone',
     'hide-chain-toggle': 'hideChain',
     'show-dimensions-toggle': 'showDimensions',
+    'auto-rotate-toggle': 'autoRotate',
     'use-custom-color': 'useCustomColor',
     'relief-invert-toggle': 'reliefInvert'
   };
@@ -443,6 +446,7 @@ export function initUI(onChange) {
     'third-line-font': 'thirdLineFont',
     'text-alignment': 'textAlignment',
     'shape-select': 'pendantShape',
+    'chain-type-select': 'chainType',
     'export-format': 'exportFormat'
   };
 

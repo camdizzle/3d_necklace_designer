@@ -71,6 +71,7 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
         if (i === 0) shape.moveTo(x, y);
         else shape.lineTo(x, y);
       }
+      shape.closePath();
       return { shape, w: width, h: height };
     }
 
@@ -102,7 +103,13 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
       shape.bezierCurveTo(-s * 1.1, -s * 0.1, -s * 0.4, -s * 0.5, 0, -s);
       shape.bezierCurveTo(s * 0.4, -s * 0.5, s * 1.1, -s * 0.1, s * 0.9, s * 0.4);
       shape.bezierCurveTo(s * 0.7, s * 0.95, s * 0.1, s * 0.95, 0, s * 0.7);
-      return { shape, w: s * 2, h: s * 2 };
+      const heartPts = shape.getPoints(64);
+      let hMinX = Infinity, hMaxX = -Infinity, hMinY = Infinity, hMaxY = -Infinity;
+      for (const p of heartPts) {
+        hMinX = Math.min(hMinX, p.x); hMaxX = Math.max(hMaxX, p.x);
+        hMinY = Math.min(hMinY, p.y); hMaxY = Math.max(hMaxY, p.y);
+      }
+      return { shape, w: hMaxX - hMinX, h: hMaxY - hMinY };
     }
 
     case 'star': {
@@ -815,16 +822,42 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
 
   // Border / frame — full plate depth, flush at back, raised on front
   if (borderWidth > 0) {
-    const borderOuter = createPlateShape(
-      pendantShape || 'rectangle',
-      rawW + borderWidth * 2,
-      rawH + borderWidth * 2,
-      plateRadius + borderWidth,
-      customShapePoints
-    );
+    let borderOuter;
+    if (pendantShape === 'outline' && plateShape) {
+      // Offset outline contour outward for border
+      const pts = plateShape.getPoints(64);
+      const offsetPts = [];
+      for (let i = 0; i < pts.length; i++) {
+        const prev = pts[(i - 1 + pts.length) % pts.length];
+        const next = pts[(i + 1) % pts.length];
+        const dx = next.x - prev.x;
+        const dy = next.y - prev.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        // Outward normal (perpendicular, pointing outward for CCW winding)
+        const nx = -dy / len;
+        const ny = dx / len;
+        offsetPts.push(new THREE.Vector2(pts[i].x + nx * borderWidth, pts[i].y + ny * borderWidth));
+      }
+      const outerShape = new THREE.Shape();
+      outerShape.moveTo(offsetPts[0].x, offsetPts[0].y);
+      for (let i = 1; i < offsetPts.length; i++) {
+        outerShape.lineTo(offsetPts[i].x, offsetPts[i].y);
+      }
+      outerShape.closePath();
+      borderOuter = { shape: outerShape, w: plateW + borderWidth * 2, h: plateH + borderWidth * 2 };
+    } else {
+      borderOuter = createPlateShape(
+        pendantShape || 'rectangle',
+        rawW + borderWidth * 2,
+        rawH + borderWidth * 2,
+        plateRadius + borderWidth,
+        customShapePoints
+      );
+    }
 
     const holePath = new THREE.Path();
     const platePoints = plateShape.getPoints(48);
+    platePoints.reverse();
     holePath.setFromPoints(platePoints);
     borderOuter.shape.holes.push(holePath);
 

@@ -105,7 +105,7 @@ function updateDimensions() {
     dimensionsEl.style.display = 'none';
     return;
   }
-  const dims = computeDimensions(scene);
+  const dims = computeDimensions(pendantGroup);
   if (dims) {
     dimensionsEl.style.display = 'block';
     dimensionsEl.textContent = `${dims.width} x ${dims.height} x ${dims.depth} mm`;
@@ -258,6 +258,12 @@ const state = initUI(async (newState, changedKey) => {
     return;
   }
 
+  // Auto-rotate toggle
+  if (changedKey === 'autoRotate') {
+    controls.autoRotate = newState.autoRotate;
+    return;
+  }
+
   // Quick repositioning — no rebuild needed, just update transform in-place
   if (['pendantOffsetX', 'pendantOffsetY', 'pendantOffsetZ', 'pendantScale'].includes(changedKey)) {
     applyPendantTransform(newState);
@@ -332,8 +338,12 @@ exportBtn.addEventListener('click', () => {
     showUpgradeModal(FEATURES.export);
     return;
   }
+  if (!pendantGroup) {
+    alert('No pendant to export.');
+    return;
+  }
   const text = state.text || 'necklace';
-  exportByFormat(scene, text, state.exportFormat || 'stl');
+  exportByFormat(pendantGroup, text, state.exportFormat || 'stl');
 });
 
 // Screenshot — free with watermark, Pro without.
@@ -467,9 +477,15 @@ if (orderBtn) {
       const comments = orderCommentsInput?.value?.trim() || '';
 
       try {
-        scene.updateMatrixWorld(true);
+        if (!pendantGroup) {
+          alert('No pendant to export.');
+          orderModalGo.disabled = false;
+          orderModalGo.textContent = 'PROCEED TO CHECKOUT';
+          return;
+        }
+        pendantGroup.updateMatrixWorld(true);
         const exporter = new STLExporter();
-        const stlBuffer = exporter.parse(scene, { binary: true });
+        const stlBuffer = exporter.parse(pendantGroup, { binary: true });
 
         const bytes = new Uint8Array(stlBuffer);
         let binary = '';
@@ -485,7 +501,6 @@ if (orderBtn) {
             stlBase64,
             designName,
             designDetails: details,
-            priceInCents: totalCents,
             quantity: qty,
             comments
           })
@@ -548,10 +563,10 @@ if (orderModal) {
   }
 }
 
-// Reset
+// Reset with confirmation
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
-    // Reset is handled in ui.js — it fires onChange for each field
+    if (!confirm('Reset all settings to defaults? This cannot be undone.')) return;
     window.dispatchEvent(new CustomEvent('reset-to-defaults'));
   });
 }
@@ -731,6 +746,56 @@ if (stlImportInput) {
     }
   });
 }
+
+// Clear import buttons
+document.getElementById('clear-svg')?.addEventListener('click', async () => {
+  state.customShapePoints = null;
+  state.pendantShape = 'rectangle';
+  const shapeSelect = document.getElementById('shape-select');
+  if (shapeSelect) shapeSelect.value = 'rectangle';
+  const svgEl = document.getElementById('svg-import');
+  if (svgEl) svgEl.value = '';
+  await rebuildPendant(state);
+});
+
+document.getElementById('clear-stl')?.addEventListener('click', async () => {
+  state.customSTLGeometry = null;
+  const stlEl = document.getElementById('stl-import');
+  if (stlEl) stlEl.value = '';
+  await rebuildPendant(state);
+});
+
+document.getElementById('clear-silhouette')?.addEventListener('click', async () => {
+  silhouetteImageFile = null;
+  state.customShapePoints = null;
+  state.pendantShape = 'rectangle';
+  const shapeSelect = document.getElementById('shape-select');
+  if (shapeSelect) shapeSelect.value = 'rectangle';
+  const imgEl = document.getElementById('image-silhouette-import');
+  if (imgEl) imgEl.value = '';
+  await rebuildPendant(state);
+});
+
+document.getElementById('clear-relief')?.addEventListener('click', async () => {
+  reliefImageFile = null;
+  state.reliefData = null;
+  const imgEl = document.getElementById('image-relief-import');
+  if (imgEl) imgEl.value = '';
+  await rebuildPendant(state);
+});
+
+// Hide corner radius slider for non-rectangle shapes
+const cornerRadiusGroup = document.getElementById('plate-radius')?.closest('.control-group');
+function updateCornerRadiusVisibility() {
+  if (!cornerRadiusGroup) return;
+  cornerRadiusGroup.style.display = state.pendantShape === 'rectangle' ? '' : 'none';
+}
+const shapeSelectEl = document.getElementById('shape-select');
+if (shapeSelectEl) {
+  const origHandler = shapeSelectEl.onchange;
+  shapeSelectEl.addEventListener('change', () => setTimeout(updateCornerRadiusVisibility, 0));
+}
+updateCornerRadiusVisibility();
 
 (async () => {
   await initPremium();

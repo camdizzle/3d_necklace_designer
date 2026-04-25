@@ -17,6 +17,52 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ORDERS_DIR = path.join(__dirname, '..', 'orders');
 
+// -----------------------------------------------------------------
+// Pricing constants
+// -----------------------------------------------------------------
+const UNIT_PRICE_CENTS = 2500; // $25 per unit
+
+function computePrice(quantity) {
+  // Buy 3 get 1 free: every 4th item is free
+  const freeItems = Math.floor(quantity / 4);
+  const paidItems = quantity - freeItems;
+  return { paidItems, totalCents: paidItems * UNIT_PRICE_CENTS };
+}
+
+// -----------------------------------------------------------------
+// Simple in-memory rate limiter
+// -----------------------------------------------------------------
+const rateLimitMap = new Map(); // key: ip -> { count, resetTime }
+
+function rateLimit(ip, maxRequests, windowMs) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
+    return false; // not limited
+  }
+  entry.count++;
+  if (entry.count > maxRequests) {
+    return true; // limited
+  }
+  return false;
+}
+
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetTime) rateLimitMap.delete(ip);
+  }
+}, 5 * 60 * 1000).unref();
+
+// -----------------------------------------------------------------
+// Order ID validation (alphanumeric and dashes only)
+// -----------------------------------------------------------------
+function isValidOrderId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9-]+$/.test(id);
+}
+
 // Ensure orders directory exists
 if (!fs.existsSync(ORDERS_DIR)) {
   fs.mkdirSync(ORDERS_DIR, { recursive: true });
@@ -124,6 +170,12 @@ export function updateOrder(id, updates) {
 // STL first (so we have it even if the customer abandons checkout),
 // then create the Checkout session and return the URL.
 ordersRouter.post('/checkout', async (req, res) => {
+  // Rate limit: max 5 checkout requests per IP per minute
+  const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (rateLimit(clientIp, 5, 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
@@ -131,11 +183,15 @@ ordersRouter.post('/checkout', async (req, res) => {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { stlBase64, designName, designDetails, priceInCents, quantity, comments } = req.body;
+  const { stlBase64, designName, designDetails, quantity, comments } = req.body;
 
   if (!stlBase64) {
     return res.status(400).json({ error: 'Missing STL data' });
   }
+
+  // Server-side pricing: $25 per unit, buy 3 get 1 free
+  const qty = Math.min(100, Math.max(1, parseInt(quantity) || 1));
+  const { paidItems, totalCents } = computePrice(qty);
 
   // Save the STL to a temp file in orders/ — we'll rename it to the
   // order ID once the webhook fires.
@@ -145,9 +201,6 @@ ordersRouter.post('/checkout', async (req, res) => {
 
   try {
     const stripe = new Stripe(stripeKey);
-
-    const unitAmount = priceInCents || 2500;
-    const qty = Math.max(1, parseInt(quantity) || 1);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -160,9 +213,9 @@ ordersRouter.post('/checkout', async (req, res) => {
               name: `Custom Chain: ${designName || 'My Design'} (x${qty})`,
               description: designDetails || 'Custom 3D-printed pendant necklace'
             },
-            unit_amount: unitAmount
+            unit_amount: UNIT_PRICE_CENTS
           },
-          quantity: 1
+          quantity: paidItems
         }
       ],
       shipping_address_collection: {
@@ -188,28 +241,5 @@ ordersRouter.post('/checkout', async (req, res) => {
   }
 });
 
-// POST /api/upload-stl — alternative: upload STL before checkout
-// (if we want to decouple the upload from the checkout creation).
-ordersRouter.post('/upload-stl', (req, res) => {
-  const { stlBase64 } = req.body;
-  if (!stlBase64) {
-    return res.status(400).json({ error: 'Missing STL data' });
-  }
-
-  const tempName = `pending_${crypto.randomBytes(8).toString('hex')}.stl`;
-  const tempPath = path.join(ORDERS_DIR, tempName);
-  fs.writeFileSync(tempPath, Buffer.from(stlBase64, 'base64'));
-
-  res.json({ filename: tempName });
-});
-
-// GET /api/orders/:id/stl — download the STL for an order (admin use)
-ordersRouter.get('/orders/:id/stl', (req, res) => {
-  const p = stlPath(req.params.id);
-  if (!fs.existsSync(p)) {
-    return res.status(404).json({ error: 'STL not found' });
-  }
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${req.params.id}.stl"`);
-  fs.createReadStream(p).pipe(res);
-});
+// Public STL download removed — use authenticated admin route at
+// /admin/api/orders/:id/stl instead.

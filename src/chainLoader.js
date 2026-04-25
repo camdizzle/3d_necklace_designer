@@ -69,12 +69,21 @@ function findChainAttachPoint(geometry) {
   };
 }
 
-export function loadChain(materialKey = 'gold') {
+const CHAIN_MODELS = {
+  rope: 'chain_loop.stl',
+  box: 'chain_loop.stl',
+  cuban: 'chain_loop.stl',
+  figaro: 'chain_loop.stl',
+  snake: 'chain_loop.stl'
+};
+
+export function loadChain(materialKey = 'gold', chainType = 'rope') {
   return new Promise((resolve, reject) => {
     const loader = new STLLoader();
+    const modelFile = CHAIN_MODELS[chainType] || CHAIN_MODELS.rope;
 
     loader.load(
-      'chain_loop.stl',
+      modelFile,
       (geometry) => {
         geometry.computeVertexNormals();
         geometry.center();
