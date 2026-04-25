@@ -937,11 +937,11 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   });
 
   if (chainInfo) {
-    const { innerTopY, bailHeight, bailZCenter } = chainInfo;
+    const { innerTopY, bailHeight, bailZCenter, bailXCenter } = chainInfo;
     const hasBail = chainType === 'cuban' || chainType === 'twisted-star';
 
     const pendantCenterY = hasBail
-      ? innerTopY + bailHeight
+      ? innerTopY + bailHeight - 3
       : innerTopY;
 
     const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
@@ -951,6 +951,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       ? baseZ + bailZCenter
       : baseZ;
 
+    const defaultX = hasBail ? (bailXCenter || 0) : 0;
+
     return {
       group,
       width: plateW,
@@ -958,7 +960,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       rawW,
       rawH,
       pendantCenterY,
-      defaultZ
+      defaultZ,
+      defaultX
     };
   }
 

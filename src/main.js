@@ -47,6 +47,7 @@ let chainInfo = null;
 let pendantGroup = null;
 let lastPendantCenterY = 0;
 let lastDefaultZ = 0;
+let lastDefaultX = 0;
 let lastPendantWidth = 0;
 let lastPendantHeight = 0;
 let silhouetteImageFile = null;
@@ -85,6 +86,7 @@ async function init() {
       innerBottomY: chain.innerBottomY,
       bailHeight: chain.bailHeight,
       bailZCenter: chain.bailZCenter,
+      bailXCenter: chain.bailXCenter,
       chainThickness: chain.chainThickness
     };
     scene.add(chainMesh);
@@ -140,7 +142,7 @@ function applyPendantTransform(state) {
   const ps = state.pendantScale;
   pendantGroup.scale.setScalar(ps);
   pendantGroup.position.set(
-    state.pendantOffsetX,
+    lastDefaultX + state.pendantOffsetX,
     lastPendantCenterY + state.pendantOffsetY,
     lastDefaultZ * ps + state.pendantOffsetZ
   );
@@ -164,6 +166,7 @@ async function rebuildPendant(state) {
     innerBottomY: chainInfo.innerBottomY * scale,
     bailHeight: chainInfo.bailHeight * scale,
     bailZCenter: chainInfo.bailZCenter * scale,
+    bailXCenter: chainInfo.bailXCenter * scale,
     chainThickness: chainInfo.chainThickness * scale
   } : null;
 
@@ -229,6 +232,7 @@ async function rebuildPendant(state) {
   pendantGroup = result.group;
   lastPendantCenterY = result.pendantCenterY || 0;
   lastDefaultZ = result.defaultZ || 0;
+  lastDefaultX = result.defaultX || 0;
   lastPendantWidth = result.width || 0;
   lastPendantHeight = result.height || 0;
 
@@ -299,6 +303,7 @@ const state = initUI(async (newState, changedKey) => {
         innerBottomY: chain.innerBottomY,
         bailHeight: chain.bailHeight,
         bailZCenter: chain.bailZCenter,
+        bailXCenter: chain.bailXCenter,
         chainThickness: chain.chainThickness
       };
       chainMesh.scale.setScalar(newState.chainScale);

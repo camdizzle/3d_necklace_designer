@@ -61,15 +61,22 @@ function findChainAttachPoint(geometry) {
   }
 
   const bailZVals = [];
+  const bailXVals = [];
   for (let i = 0; i < count; i++) {
     const y = pos.getY(i);
     const x = pos.getX(i);
     if (y >= gapEnd && y <= gapEnd + bailHeight && Math.abs(x) < xTolerance) {
       bailZVals.push(pos.getZ(i));
     }
+    if (y >= gapEnd && y <= gapEnd + bailHeight && Math.abs(x) < 30) {
+      bailXVals.push(x);
+    }
   }
   const bailZCenter = bailZVals.length > 0
     ? (Math.min(...bailZVals) + Math.max(...bailZVals)) / 2
+    : 0;
+  const bailXCenter = bailXVals.length > 0
+    ? (Math.min(...bailXVals) + Math.max(...bailXVals)) / 2
     : 0;
 
   return {
@@ -78,6 +85,7 @@ function findChainAttachPoint(geometry) {
     innerBottomY: gapStart,
     bailHeight,
     bailZCenter,
+    bailXCenter,
     attachX
   };
 }
@@ -140,6 +148,7 @@ export function loadChain(materialKey = 'gold', chainType = 'rope') {
           innerBottomY: attach.innerBottomY,
           bailHeight: attach.bailHeight,
           bailZCenter: attach.bailZCenter,
+          bailXCenter: attach.bailXCenter,
           chainThickness: size.z
         });
       },
