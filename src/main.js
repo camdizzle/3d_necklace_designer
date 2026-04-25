@@ -343,7 +343,7 @@ const state = initUI(async (newState, changedKey) => {
 });
 
 // Export (Pro-gated)
-exportBtn.addEventListener('click', async () => {
+if (exportBtn) exportBtn.addEventListener('click', async () => {
   if (!isPro()) {
     showUpgradeModal(FEATURES.export);
     return;
@@ -423,6 +423,10 @@ if (orderQuantityInput) {
 }
 
 // Order This Chain — opens modal, then sends to Stripe Checkout
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function buildDesignDetails(st) {
   const lineEntries = [
     { text: st.text, font: st.font, color: st.lineColor1 },
@@ -455,10 +459,10 @@ if (orderBtn) {
     updateOrderPriceDisplay();
 
     let detailsHtml =
-      `<strong>Design:</strong> ${designName}<br>` +
-      `<strong>Shape:</strong> ${state.pendantShape}<br>` +
-      `<strong>Material look:</strong> ${state.material}` +
-      (state.twoTone ? ` / chain: ${state.chainMaterial}` : '') + `<br>`;
+      `<strong>Design:</strong> ${esc(designName)}<br>` +
+      `<strong>Shape:</strong> ${esc(state.pendantShape)}<br>` +
+      `<strong>Material look:</strong> ${esc(state.material)}` +
+      (state.twoTone ? ` / chain: ${esc(state.chainMaterial)}` : '') + `<br>`;
 
     const colorLabels = [
       { text: state.text, color: state.lineColor1 },
@@ -469,11 +473,11 @@ if (orderBtn) {
     if (colorLabels.length > 0) {
       detailsHtml += `<strong>Text colors:</strong> `;
       detailsHtml += colorLabels.map(e =>
-        `"${e.text}" <span style="display:inline-block;width:12px;height:12px;background:${e.color};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${e.color}`
+        `"${esc(e.text)}" <span style="display:inline-block;width:12px;height:12px;background:${esc(e.color)};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${esc(e.color)}`
       ).join(', ') + `<br>`;
     }
 
-    detailsHtml += `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${state.material}-tone finish.`;
+    detailsHtml += `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${esc(state.material)}-tone finish.`;
 
     orderModalDetails.innerHTML = detailsHtml;
     orderModal.classList.add('open');
@@ -612,12 +616,22 @@ if (loadPresetBtn) {
   });
 }
 
+const MAX_UPLOAD_MB = 10;
+function checkFileSize(file) {
+  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+    csAlert(`File is too large (max ${MAX_UPLOAD_MB}MB).`);
+    return false;
+  }
+  return true;
+}
+
 // SVG import (Pro)
 const svgInput = document.getElementById('svg-import');
 if (svgInput) {
   svgInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!checkFileSize(file)) { svgInput.value = ''; return; }
     if (!isPro()) {
       svgInput.value = '';
       showUpgradeModal(FEATURES.customSvg);
@@ -685,6 +699,7 @@ if (imageSilhouetteInput) {
   imageSilhouetteInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!checkFileSize(file)) { imageSilhouetteInput.value = ''; return; }
     if (!isPro()) {
       imageSilhouetteInput.value = '';
       showUpgradeModal(FEATURES.imageSilhouette);
@@ -712,6 +727,7 @@ if (imageReliefInput) {
   imageReliefInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!checkFileSize(file)) { imageReliefInput.value = ''; return; }
     if (!isPro()) {
       imageReliefInput.value = '';
       showUpgradeModal(FEATURES.imageRelief);
@@ -738,6 +754,7 @@ if (stlImportInput) {
   stlImportInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!checkFileSize(file)) { stlImportInput.value = ''; return; }
     if (!isPro()) {
       stlImportInput.value = '';
       showUpgradeModal(FEATURES.stlImport);

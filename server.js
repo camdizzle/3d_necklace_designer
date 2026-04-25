@@ -26,6 +26,13 @@ import { adminRouter } from './api/admin.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const REQUIRED_ENV = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.warn(`WARNING: ${key} is not set. Orders will not work.`);
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

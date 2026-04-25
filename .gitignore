@@ -4,3 +4,4 @@ dist/
 orders/
 .env
 .env.*
+!.env.example
