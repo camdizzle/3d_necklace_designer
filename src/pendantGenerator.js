@@ -941,14 +941,15 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const hasBail = chainType === 'cuban' || chainType === 'twisted-star';
 
     const pendantCenterY = hasBail
-      ? innerTopY + bailHeight - 3
+      ? innerTopY + bailHeight
       : innerTopY;
 
     const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
     const backZ = -0.5;
+    const baseZ = -(frontZ + backZ) / 2;
     const defaultZ = hasBail
-      ? -0.5
-      : -(frontZ + backZ) / 2;
+      ? baseZ + bailZCenter
+      : baseZ;
 
     return {
       group,
