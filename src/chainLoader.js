@@ -78,6 +78,10 @@ const CHAIN_MODELS = {
   snake: 'chain_loop.stl'
 };
 
+const CHAIN_ROTATIONS = {
+  'twisted-star': Math.PI / 2
+};
+
 export function loadChain(materialKey = 'gold', chainType = 'rope') {
   return new Promise((resolve, reject) => {
     const loader = new STLLoader();
@@ -88,6 +92,12 @@ export function loadChain(materialKey = 'gold', chainType = 'rope') {
       (geometry) => {
         geometry.computeVertexNormals();
         geometry.center();
+
+        const rotation = CHAIN_ROTATIONS[chainType];
+        if (rotation) {
+          geometry.rotateZ(rotation);
+          geometry.center();
+        }
 
         let attach = findChainAttachPoint(geometry);
 

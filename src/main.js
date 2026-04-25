@@ -212,7 +212,8 @@ async function rebuildPendant(state) {
     lineColor2: state.lineColor2,
     lineColor3: state.lineColor3,
     lockedPlateW: state.lockPendantSize ? state.lockedPlateW : null,
-    lockedPlateH: state.lockPendantSize ? state.lockedPlateH : null
+    lockedPlateH: state.lockPendantSize ? state.lockedPlateH : null,
+    chainType: state.chainType
   }, getMaterialOpts(state), scaledChainInfo);
 
   if (!result) return;
