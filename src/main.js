@@ -84,6 +84,7 @@ async function init() {
       innerTopY: chain.innerTopY,
       innerBottomY: chain.innerBottomY,
       bailHeight: chain.bailHeight,
+      bailZCenter: chain.bailZCenter,
       chainThickness: chain.chainThickness
     };
     scene.add(chainMesh);
@@ -162,6 +163,7 @@ async function rebuildPendant(state) {
     innerTopY: chainInfo.innerTopY * scale,
     innerBottomY: chainInfo.innerBottomY * scale,
     bailHeight: chainInfo.bailHeight * scale,
+    bailZCenter: chainInfo.bailZCenter * scale,
     chainThickness: chainInfo.chainThickness * scale
   } : null;
 
@@ -296,6 +298,7 @@ const state = initUI(async (newState, changedKey) => {
         innerTopY: chain.innerTopY,
         innerBottomY: chain.innerBottomY,
         bailHeight: chain.bailHeight,
+        bailZCenter: chain.bailZCenter,
         chainThickness: chain.chainThickness
       };
       chainMesh.scale.setScalar(newState.chainScale);

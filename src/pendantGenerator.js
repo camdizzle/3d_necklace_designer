@@ -937,14 +937,18 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   });
 
   if (chainInfo) {
-    const { innerTopY } = chainInfo;
+    const { innerTopY, bailHeight, bailZCenter } = chainInfo;
+    const hasBail = chainType === 'cuban' || chainType === 'twisted-star';
 
-    // The pendant's ring sits at the top of the chain gap
-    const pendantCenterY = innerTopY;
+    const pendantCenterY = hasBail
+      ? innerTopY + bailHeight - 3
+      : innerTopY;
 
     const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
     const backZ = -0.5;
-    const defaultZ = -(frontZ + backZ) / 2;
+    const defaultZ = hasBail
+      ? -(frontZ + backZ) / 2 + bailZCenter
+      : -(frontZ + backZ) / 2;
 
     return {
       group,
