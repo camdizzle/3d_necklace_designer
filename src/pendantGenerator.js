@@ -909,29 +909,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     group.add(reliefMesh);
   }
 
-  // Pendant ring (bail loop) — attached to top of plate for chain to pass through.
-  // Skipped for cuban chain which connects directly.
-  let ringHeight = 0;
-  if (chainType !== 'cuban' && chainType !== 'twisted-star') {
-    const ringRadius = 4;
-    const tubeRadius = 1.2;
-    const ringGeo = new THREE.TorusGeometry(ringRadius, tubeRadius, 12, 24);
-    // Orient ring so the hole faces left-right (chain passes through along X)
-    ringGeo.rotateY(Math.PI / 2);
-    const ringMesh = new THREE.Mesh(ringGeo, material.clone());
-    const ringTopY = plateH / 2 + (borderWidth > 0 ? borderWidth : 0);
-    ringMesh.position.set(0, ringTopY + ringRadius, 0);
-    // Center the ring in Z to align with the plate
-    const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
-    const backZ = -0.5;
-    ringMesh.position.z = (frontZ + backZ) / 2;
-    group.add(ringMesh);
-    ringHeight = ringRadius * 2 + tubeRadius;
-  }
-
   // Anchor pendant from top edge: shift all children so group origin = top center.
-  // Account for border extending above the plate and the ring above that.
-  const topShift = plateH / 2 + (borderWidth > 0 ? borderWidth : 0) + ringHeight;
+  const topShift = plateH / 2 + (borderWidth > 0 ? borderWidth : 0);
   group.children.forEach(child => {
     child.position.y -= topShift;
   });
