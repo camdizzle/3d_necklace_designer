@@ -66,7 +66,10 @@ function createPlateShape(shapeType, width, height, radius, customShapePoints) {
       const segments = 48;
       for (let i = 0; i <= segments; i++) {
         const angle = (i / segments) * Math.PI * 2;
-        shape.lineTo(Math.cos(angle) * hw, Math.sin(angle) * hh);
+        const x = Math.cos(angle) * hw;
+        const y = Math.sin(angle) * hh;
+        if (i === 0) shape.moveTo(x, y);
+        else shape.lineTo(x, y);
       }
       return { shape, w: width, h: height };
     }
