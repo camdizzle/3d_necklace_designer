@@ -192,7 +192,11 @@ function buildModal() {
       errorEl.textContent = '';
       close();
       // Small celebratory toast would be nice, but keep it minimal.
-      setTimeout(() => alert('Pro unlocked! All features are now available.'), 100);
+      const toast = document.createElement('div');
+      toast.className = 'cs-toast';
+      toast.textContent = 'Pro unlocked! All features are now available.';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
     } else {
       errorEl.textContent = 'Invalid license key. Keys look like XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX.';
     }

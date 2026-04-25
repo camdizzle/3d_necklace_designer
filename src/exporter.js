@@ -2,6 +2,7 @@ import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as THREE from 'three';
+import { csAlert } from './modal.js';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -13,7 +14,7 @@ function downloadBlob(blob, filename) {
 }
 
 export function exportSTL(group, filename = 'necklace.stl') {
-  if (!group) { alert('No pendant to export.'); return; }
+  if (!group) { csAlert('No pendant to export.'); return; }
   group.updateMatrixWorld(true);
   const exporter = new STLExporter();
   const result = exporter.parse(group, { binary: true });
@@ -21,7 +22,7 @@ export function exportSTL(group, filename = 'necklace.stl') {
 }
 
 export function exportOBJ(group, filename = 'necklace.obj') {
-  if (!group) { alert('No pendant to export.'); return; }
+  if (!group) { csAlert('No pendant to export.'); return; }
   group.updateMatrixWorld(true);
   const exporter = new OBJExporter();
   const result = exporter.parse(group);
@@ -29,7 +30,7 @@ export function exportOBJ(group, filename = 'necklace.obj') {
 }
 
 export function exportGLB(group, filename = 'necklace.glb') {
-  if (!group) { alert('No pendant to export.'); return; }
+  if (!group) { csAlert('No pendant to export.'); return; }
   group.updateMatrixWorld(true);
   const exporter = new GLTFExporter();
   exporter.parse(

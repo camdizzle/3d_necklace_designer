@@ -9,6 +9,9 @@ import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
 import { traceImageSilhouette, createHeightmapData } from './imageProcessor.js';
 import { initPremium, isPro, showUpgradeModal, FEATURES } from './premium.js';
+import { createUndoRedo } from './undoRedo.js';
+import { csAlert, csConfirm, csPrompt } from './modal.js';
+import { stateToShareUrl, loadStateFromUrl, clearShareHash } from './shareUrl.js';
 
 const viewport = document.getElementById('viewport');
 const loading = document.getElementById('loading');
@@ -29,6 +32,12 @@ const orderDiscountNote = document.getElementById('order-discount-note');
 const qtyMinus = document.getElementById('qty-minus');
 const qtyPlus = document.getElementById('qty-plus');
 const orderCommentsInput = document.getElementById('order-comments');
+
+const undoRedo = createUndoRedo();
+const shareBtn = document.getElementById('share-btn');
+const undoBtn = document.getElementById('undo-btn');
+const redoBtn = document.getElementById('redo-btn');
+const orderPreviewWrap = document.getElementById('order-preview-wrap');
 
 const { scene, camera, renderer, controls } = createScene(viewport);
 
@@ -240,6 +249,7 @@ function applyChainMaterial(state) {
 
 // UI
 const state = initUI(async (newState, changedKey) => {
+  window.dispatchEvent(new CustomEvent('state-changed', { detail: changedKey }));
   // Background color
   if (changedKey === 'backgroundColor') {
     scene.background = new THREE.Color(newState.backgroundColor);
@@ -333,13 +343,13 @@ const state = initUI(async (newState, changedKey) => {
 });
 
 // Export (Pro-gated)
-exportBtn.addEventListener('click', () => {
+exportBtn.addEventListener('click', async () => {
   if (!isPro()) {
     showUpgradeModal(FEATURES.export);
     return;
   }
   if (!pendantGroup) {
-    alert('No pendant to export.');
+    await csAlert('No pendant to export.');
     return;
   }
   const text = state.text || 'necklace';
@@ -478,7 +488,7 @@ if (orderBtn) {
 
       try {
         if (!pendantGroup) {
-          alert('No pendant to export.');
+          csAlert('No pendant to export.');
           orderModalGo.disabled = false;
           orderModalGo.textContent = 'PROCEED TO CHECKOUT';
           return;
@@ -515,7 +525,7 @@ if (orderBtn) {
         window.location.href = url;
       } catch (err) {
         console.error('Order failed:', err);
-        alert('Failed to start checkout: ' + err.message);
+        csAlert('Failed to start checkout: ' + err.message);
         orderModalGo.disabled = false;
         orderModalGo.textContent = 'PROCEED TO CHECKOUT';
       }
@@ -565,19 +575,19 @@ if (orderModal) {
 
 // Reset with confirmation
 if (resetBtn) {
-  resetBtn.addEventListener('click', () => {
-    if (!confirm('Reset all settings to defaults? This cannot be undone.')) return;
+  resetBtn.addEventListener('click', async () => {
+    const confirmed = await csConfirm('Reset all settings to defaults? This cannot be undone.');
+    if (!confirmed) return;
     window.dispatchEvent(new CustomEvent('reset-to-defaults'));
   });
 }
 
 // Save preset
 if (savePresetBtn) {
-  savePresetBtn.addEventListener('click', () => {
-    const name = prompt('Preset name:');
+  savePresetBtn.addEventListener('click', async () => {
+    const name = await csPrompt('Preset name:');
     if (!name) return;
     const presets = JSON.parse(localStorage.getItem('necklace_presets') || '{}');
-    // Save serializable state (exclude non-serializable data)
     const saveState = { ...state };
     delete saveState.reliefData;
     delete saveState.customSTLGeometry;
@@ -589,14 +599,14 @@ if (savePresetBtn) {
 
 // Load preset
 if (loadPresetBtn) {
-  loadPresetBtn.addEventListener('click', () => {
+  loadPresetBtn.addEventListener('click', async () => {
     const presets = JSON.parse(localStorage.getItem('necklace_presets') || '{}');
     const names = Object.keys(presets);
     if (names.length === 0) {
-      alert('No saved presets.');
+      await csAlert('No saved presets.');
       return;
     }
-    const name = prompt('Load preset:\n' + names.join('\n'));
+    const name = await csPrompt('Load preset:<br><span style="font-size:12px;color:var(--text-dim)">' + names.join(', ') + '</span>');
     if (!name || !presets[name]) return;
     window.dispatchEvent(new CustomEvent('load-preset', { detail: presets[name] }));
   });
@@ -633,7 +643,7 @@ if (svgInput) {
       }
 
       if (allPoints.length < 3) {
-        alert('Could not extract shapes from SVG.');
+        csAlert('Could not extract shapes from SVG.');
         return;
       }
 
@@ -664,7 +674,7 @@ if (svgInput) {
       }
     } catch (err) {
       console.error('SVG parse error:', err);
-      alert('Failed to parse SVG file.');
+      csAlert('Failed to parse SVG file.');
     }
   });
 }
@@ -685,13 +695,13 @@ if (imageSilhouetteInput) {
       const threshold = state.imageThreshold || 128;
       const points = await traceImageSilhouette(file, { threshold });
       if (points.length < 3) {
-        alert('Could not extract a silhouette from this image. Try adjusting the threshold.');
+        csAlert('Could not extract a silhouette from this image. Try adjusting the threshold.');
         return;
       }
       window.dispatchEvent(new CustomEvent('svg-shape-loaded', { detail: points }));
     } catch (err) {
       console.error('Image silhouette error:', err);
-      alert('Failed to process image for silhouette.');
+      csAlert('Failed to process image for silhouette.');
     }
   });
 }
@@ -717,7 +727,7 @@ if (imageReliefInput) {
       await rebuildPendant(state);
     } catch (err) {
       console.error('Image relief error:', err);
-      alert('Failed to process image for relief.');
+      csAlert('Failed to process image for relief.');
     }
   });
 }
@@ -742,7 +752,7 @@ if (stlImportInput) {
       await rebuildPendant(state);
     } catch (err) {
       console.error('STL import error:', err);
-      alert('Failed to load STL file.');
+      csAlert('Failed to load STL file.');
     }
   });
 }
@@ -792,12 +802,110 @@ function updateCornerRadiusVisibility() {
 }
 const shapeSelectEl = document.getElementById('shape-select');
 if (shapeSelectEl) {
-  const origHandler = shapeSelectEl.onchange;
   shapeSelectEl.addEventListener('change', () => setTimeout(updateCornerRadiusVisibility, 0));
 }
 updateCornerRadiusVisibility();
 
+// --- Undo/Redo ---
+let undoRedoActive = false;
+
+function applyUndoRedoSnap(snap) {
+  if (!snap) return;
+  undoRedoActive = true;
+  Object.assign(state, snap);
+  window.dispatchEvent(new CustomEvent('load-preset', { detail: snap }));
+  undoRedoActive = false;
+}
+
+if (undoBtn) {
+  undoBtn.addEventListener('click', () => applyUndoRedoSnap(undoRedo.undo(state)));
+}
+if (redoBtn) {
+  redoBtn.addEventListener('click', () => applyUndoRedoSnap(undoRedo.redo(state)));
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    applyUndoRedoSnap(undoRedo.undo(state));
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    e.preventDefault();
+    applyUndoRedoSnap(undoRedo.redo(state));
+  }
+});
+
+// Push state after each change (but not from undo/redo itself)
+window.addEventListener('state-changed', (e) => {
+  if (!undoRedoActive) {
+    undoRedo.pushState(state, e.detail);
+  }
+});
+
+// --- Share Design (URL) ---
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'cs-toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+if (shareBtn) {
+  shareBtn.addEventListener('click', async () => {
+    const url = stateToShareUrl(state);
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Share link copied to clipboard!');
+    } catch {
+      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      await csAlert('Share this link:<br><input type="text" value="' + safe + '" style="width:100%;margin-top:8px;padding:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px" onclick="this.select()" readonly>');
+    }
+  });
+}
+
+// --- Preview thumbnail in order modal ---
+function capturePreviewThumbnail() {
+  if (!orderPreviewWrap) return;
+  orderPreviewWrap.innerHTML = '';
+  renderer.render(scene, camera);
+  const source = renderer.domElement;
+  const canvas = document.createElement('canvas');
+  const maxW = 280;
+  const scale = maxW / source.width;
+  canvas.width = maxW;
+  canvas.height = Math.round(source.height * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  orderPreviewWrap.appendChild(canvas);
+}
+
+// Hook into order button to capture thumbnail when modal opens
+if (orderBtn) {
+  orderBtn.addEventListener('click', () => {
+    setTimeout(capturePreviewThumbnail, 50);
+  });
+}
+
 (async () => {
   await initPremium();
-  init();
+
+  // Load shared design from URL before init — merge into state so init() uses it
+  const shared = loadStateFromUrl();
+  if (shared) {
+    Object.assign(state, shared);
+    clearShareHash();
+  }
+
+  await init();
+
+  // Sync UI controls to match loaded state (shared URL)
+  if (shared) {
+    window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: state }));
+  }
+
+  // Push initial state into undo history
+  undoRedo.pushState(state);
 })();

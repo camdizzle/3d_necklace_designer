@@ -896,6 +896,159 @@
       min-height: 14px;
     }
 
+    /* Custom modal dialogs */
+    .cs-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 14, 30, 0.75);
+      backdrop-filter: blur(3px);
+      animation: cs-modal-in 0.15s ease;
+    }
+
+    @keyframes cs-modal-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .cs-modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+    }
+
+    .cs-modal-body {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .cs-modal-input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    .cs-modal-input:focus { border-color: var(--gold); }
+
+    .cs-modal-btns {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .cs-modal-btn {
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .cs-modal-btn-cancel {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+    .cs-modal-btn-cancel:hover {
+      border-color: var(--text-dim);
+      color: var(--text);
+    }
+
+    .cs-modal-btn-ok {
+      background: linear-gradient(135deg, var(--gold), #B8860B);
+      border: none;
+      color: #1a1a2e;
+    }
+    .cs-modal-btn-ok:hover { transform: translateY(-1px); }
+
+    /* Undo/Redo toolbar */
+    .undo-redo-bar {
+      display: flex;
+      gap: 6px;
+      margin: 8px 20px 4px;
+    }
+
+    .undo-redo-bar button {
+      flex: 1;
+      padding: 7px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .undo-redo-bar button:hover:not(:disabled) {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .undo-redo-bar button:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .undo-redo-bar .shortcut-hint {
+      font-size: 9px;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    /* Share button */
+    #share-btn { }
+
+    /* Toast notification for share */
+    .cs-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      z-index: 400;
+      background: #166534;
+      color: #bbf7d0;
+      border: 1px solid #22c55e;
+      animation: toast-in 0.3s ease;
+      pointer-events: none;
+    }
+
+    /* Order modal preview thumbnail */
+    .order-preview-wrap {
+      margin: 12px auto;
+      text-align: center;
+    }
+    .order-preview-wrap canvas {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      max-width: 100%;
+      height: auto;
+    }
+
     /* Mobile responsive */
     @media (max-width: 768px) {
       #app { flex-direction: column-reverse; }
@@ -1517,14 +1670,23 @@
       <button id="export-btn">Export Model</button>
       <button id="order-btn">Order This Chain</button>
 
+      <div class="undo-redo-bar">
+        <button id="undo-btn" disabled>Undo <span class="shortcut-hint">Ctrl+Z</span></button>
+        <button id="redo-btn" disabled>Redo <span class="shortcut-hint">Ctrl+Y</span></button>
+      </div>
+
       <div class="btn-row">
         <button class="btn-action" id="screenshot-btn">Screenshot</button>
-        <button class="btn-action" id="reset-btn">Reset All</button>
+        <button class="btn-action" id="share-btn">Share Design</button>
       </div>
 
       <div class="btn-row" style="margin-top:0">
         <button class="btn-action" id="save-preset-btn">Save Preset</button>
         <button class="btn-action" id="load-preset-btn">Load Preset</button>
+      </div>
+
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn-action" id="reset-btn">Reset All</button>
       </div>
 
       <div style="height:20px"></div>
@@ -1551,6 +1713,7 @@
         <input type="number" id="order-quantity" value="1" min="1" max="99">
         <button class="qty-btn" id="qty-plus">+</button>
       </div>
+      <div class="order-preview-wrap" id="order-preview-wrap"></div>
       <div class="order-modal-price" id="order-modal-price">$25.00 <span>+ free shipping</span></div>
       <div class="order-discount-note" id="order-discount-note"></div>
       <div class="order-modal-details" id="order-modal-details"></div>

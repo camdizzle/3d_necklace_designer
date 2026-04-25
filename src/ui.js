@@ -514,6 +514,14 @@ export function initUI(onChange) {
     onChange(state, 'reset');
   });
 
+  // Sync UI from external state change (e.g. shared URL) without triggering rebuild
+  window.addEventListener('sync-ui-only', (e) => {
+    const preset = e.detail;
+    if (!preset) return;
+    Object.assign(state, preset);
+    syncUIFromState();
+  });
+
   // SVG shape loaded
   window.addEventListener('svg-shape-loaded', (e) => {
     state.customShapePoints = e.detail;
