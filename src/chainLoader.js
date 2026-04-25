@@ -71,6 +71,7 @@ function findChainAttachPoint(geometry) {
 
 const CHAIN_MODELS = {
   rope: 'chain_loop.stl',
+  'twisted-star': 'Twisted Star Chain.stl',
   box: 'chain_loop.stl',
   cuban: 'chain_loop.stl',
   figaro: 'chain_loop.stl',

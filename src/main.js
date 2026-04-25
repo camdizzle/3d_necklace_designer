@@ -77,7 +77,7 @@ function getChainMaterialOpts(state) {
 
 async function init() {
   try {
-    const chain = await loadChain(DEFAULTS.material);
+    const chain = await loadChain(state.material || DEFAULTS.material, state.chainType || DEFAULTS.chainType);
     chainMesh = chain.mesh;
     chainSize = chain.size;
     chainInfo = {
@@ -88,7 +88,7 @@ async function init() {
     };
     scene.add(chainMesh);
 
-    await rebuildPendant(DEFAULTS);
+    await rebuildPendant(state);
     frameCamera();
     loading.classList.add('hidden');
     updateDimensions();
@@ -278,6 +278,32 @@ const state = initUI(async (newState, changedKey) => {
   if (['pendantOffsetX', 'pendantOffsetY', 'pendantOffsetZ', 'pendantScale'].includes(changedKey)) {
     applyPendantTransform(newState);
     updateDimensions();
+    return;
+  }
+
+  // Chain type change — reload the chain model
+  if (changedKey === 'chainType') {
+    try {
+      const matKey = newState.twoTone ? newState.chainMaterial : newState.material;
+      const chain = await loadChain(matKey, newState.chainType);
+      scene.remove(chainMesh);
+      chainMesh.geometry.dispose();
+      chainMesh.material.dispose();
+      chainMesh = chain.mesh;
+      chainSize = chain.size;
+      chainInfo = {
+        innerTopY: chain.innerTopY,
+        innerBottomY: chain.innerBottomY,
+        bailHeight: chain.bailHeight,
+        chainThickness: chain.chainThickness
+      };
+      chainMesh.scale.setScalar(newState.chainScale);
+      chainMesh.visible = !newState.hideChain;
+      scene.add(chainMesh);
+      await rebuildPendant(newState);
+    } catch (err) {
+      console.error('Failed to load chain:', err);
+    }
     return;
   }
 
