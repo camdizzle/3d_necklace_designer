@@ -947,7 +947,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
     const backZ = -0.5;
     const defaultZ = hasBail
-      ? -(frontZ + backZ) / 2 + bailZCenter
+      ? -0.5
       : -(frontZ + backZ) / 2;
 
     return {
