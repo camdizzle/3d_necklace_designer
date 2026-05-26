@@ -115,7 +115,7 @@ export const DEFAULTS = {
 
   // Line 2
   secondLineText: '',
-  secondLineFont: 'helvetiker_bold',
+  secondLineFont: 'coiny',
   secondLineSize: 16,
   secondLineCurve: 0,
   secondLineOffsetX: 0,
@@ -127,7 +127,7 @@ export const DEFAULTS = {
 
   // Line 3
   thirdLineText: '',
-  thirdLineFont: 'helvetiker_bold',
+  thirdLineFont: 'coiny',
   thirdLineSize: 14,
   thirdLineCurve: 0,
   thirdLineOffsetX: 0,

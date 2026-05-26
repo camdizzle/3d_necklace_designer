@@ -340,7 +340,7 @@ export function initUI(onChange) {
       } else {
         el.innerHTML = savedNormalOptions[id];
         if (OUTLINE_FONTS.includes(state[fontStateKeys[i]])) {
-          state[fontStateKeys[i]] = DEFAULTS[fontStateKeys[i]];
+          state[fontStateKeys[i]] = 'helvetiker_bold';
         }
         el.value = state[fontStateKeys[i]];
       }
