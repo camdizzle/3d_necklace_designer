@@ -465,6 +465,73 @@ function generateShapesWithSpacing(font, text, size, spacing, preserveCase) {
   return allShapes;
 }
 
+function buildCharShapes(glyph, scale, offsetX) {
+  const path = new THREE.ShapePath();
+  if (glyph.o) {
+    const outline = glyph._cachedOutline || (glyph._cachedOutline = glyph.o.split(' '));
+    let x, y, cpx, cpy, cpx1, cpy1, cpx2, cpy2;
+    for (let i = 0, l = outline.length; i < l;) {
+      const action = outline[i++];
+      switch (action) {
+        case 'm':
+          x = outline[i++] * scale + offsetX;
+          y = outline[i++] * scale;
+          path.moveTo(x, y);
+          break;
+        case 'l':
+          x = outline[i++] * scale + offsetX;
+          y = outline[i++] * scale;
+          path.lineTo(x, y);
+          break;
+        case 'q':
+          cpx = outline[i++] * scale + offsetX;
+          cpy = outline[i++] * scale;
+          x = outline[i++] * scale + offsetX;
+          y = outline[i++] * scale;
+          path.quadraticCurveTo(cpx, cpy, x, y);
+          break;
+        case 'b':
+          cpx1 = outline[i++] * scale + offsetX;
+          cpy1 = outline[i++] * scale;
+          cpx2 = outline[i++] * scale + offsetX;
+          cpy2 = outline[i++] * scale;
+          x = outline[i++] * scale + offsetX;
+          y = outline[i++] * scale;
+          path.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x, y);
+          break;
+      }
+    }
+  }
+  return path.toShapes();
+}
+
+function shapeBounds(shapes) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const s of shapes) {
+    for (const p of s.getPoints(8)) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+  }
+  return { minX, maxX, minY, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+function shiftShapes(shapes, dx, dy) {
+  const result = [];
+  for (const shape of shapes) {
+    const pts = shape.getPoints(12);
+    const s = new THREE.Shape(pts.map(p => new THREE.Vector2(p.x + dx, p.y + dy)));
+    for (const hole of shape.holes) {
+      const hPts = hole.getPoints(12);
+      s.holes.push(new THREE.Path(hPts.map(p => new THREE.Vector2(p.x + dx, p.y + dy))));
+    }
+    result.push(s);
+  }
+  return result;
+}
+
 function generateOutlinePendant(lines, material, materialOpts, opts) {
   const {
     outlineBaseDepth, outlineRaisedDepth, outlineScale,
@@ -475,9 +542,8 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
   const group = new THREE.Group();
   group.name = 'pendant';
 
-  const bottomShapes = [];
-  const topShapes = [];
-  let totalH = 0;
+  const allBottomShapes = [];
+  const allTopShapes = [];
   const lineData = [];
 
   for (const line of lines) {
@@ -485,97 +551,80 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     const font = fontCache[line.fontKey];
     if (!font) continue;
     const renderOpts = getTextRenderOpts(line.fontKey, line.size);
+    const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
+    const data = font.data;
+    const topScale = line.size / data.resolution;
+    const bottomScale = (line.size * outlineScale) / data.resolution;
+    const spacing = line.letterSpacing || 0;
 
-    const topSize = line.size;
-    const bottomSize = line.size * outlineScale;
-    const sizeDelta = (bottomSize - topSize) / 2;
+    const charTopShapes = [];
+    const charBottomShapes = [];
+    let cursor = 0;
 
-    const topLineShapes = generateShapesWithSpacing(font, line.text, topSize, line.letterSpacing || 0, renderOpts.preserveCase);
-    const bottomLineShapes = generateShapesWithSpacing(font, line.text, bottomSize, line.letterSpacing || 0, renderOpts.preserveCase);
-    if (topLineShapes.length === 0) continue;
-
-    let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
-    for (const s of bottomLineShapes) {
-      const pts = s.getPoints(8);
-      for (const p of pts) {
-        if (p.x < bMinX) bMinX = p.x;
-        if (p.x > bMaxX) bMaxX = p.x;
-        if (p.y < bMinY) bMinY = p.y;
-        if (p.y > bMaxY) bMaxY = p.y;
+    for (const char of displayText) {
+      if (char === ' ') {
+        cursor += line.size * 0.3 + spacing;
+        continue;
       }
-    }
-    let tMinX = Infinity, tMaxX = -Infinity, tMinY = Infinity, tMaxY = -Infinity;
-    for (const s of topLineShapes) {
-      const pts = s.getPoints(8);
-      for (const p of pts) {
-        if (p.x < tMinX) tMinX = p.x;
-        if (p.x > tMaxX) tMaxX = p.x;
-        if (p.y < tMinY) tMinY = p.y;
-        if (p.y > tMaxY) tMaxY = p.y;
+      const glyph = data.glyphs[char] || data.glyphs['?'];
+      if (!glyph) continue;
+
+      const topShapes = buildCharShapes(glyph, topScale, cursor);
+      const bottomRaw = buildCharShapes(glyph, bottomScale, 0);
+
+      if (topShapes.length > 0 && bottomRaw.length > 0) {
+        const tb = shapeBounds(topShapes);
+        const bb = shapeBounds(bottomRaw);
+        const dx = tb.cx - bb.cx;
+        const dy = tb.cy - bb.cy;
+        const bottomShifted = shiftShapes(bottomRaw, dx, dy);
+        charTopShapes.push(...topShapes);
+        charBottomShapes.push(...bottomShifted);
+      } else if (topShapes.length > 0) {
+        charTopShapes.push(...topShapes);
       }
+
+      cursor += (glyph.ha || 0) * topScale + spacing;
     }
+
+    if (charTopShapes.length === 0) continue;
+
+    const bb = shapeBounds(charBottomShapes.length > 0 ? charBottomShapes : charTopShapes);
     lineData.push({
-      topLineShapes, bottomLineShapes,
-      bMinX, bMaxX, bMinY, bMaxY,
-      tMinX, tMaxX, tMinY, tMaxY,
-      height: bMaxY - bMinY
+      topShapes: charTopShapes,
+      bottomShapes: charBottomShapes,
+      height: bb.maxY - bb.minY,
+      cx: bb.cx, cy: bb.cy
     });
-    totalH += bMaxY - bMinY;
   }
 
   if (lineData.length === 0) return null;
 
-  totalH += (lineData.length - 1) * lineData[0].height * (lineSpacing - 1) * 0.5;
+  let totalH = 0;
+  for (let i = 0; i < lineData.length; i++) {
+    totalH += lineData[i].height;
+    if (i > 0) totalH += lineData[0].height * (lineSpacing - 1) * 0.5;
+  }
 
   let cursorY = totalH / 2;
   for (let i = 0; i < lineData.length; i++) {
     const ld = lineData[i];
-    const bCenterX = (ld.bMinX + ld.bMaxX) / 2;
-    const bCenterY = (ld.bMinY + ld.bMaxY) / 2;
+    if (i > 0) cursorY -= lineData[0].height * (lineSpacing - 1) * 0.5;
     const lineY = cursorY - ld.height / 2;
-    const bYOffset = lineY - bCenterY;
-    const bXOffset = -bCenterX;
-
-    const tCenterX = (ld.tMinX + ld.tMaxX) / 2;
-    const tCenterY = (ld.tMinY + ld.tMaxY) / 2;
-    const tYOffset = lineY - tCenterY;
-    const tXOffset = -tCenterX;
-
-    for (const shape of ld.bottomLineShapes) {
-      const pts = shape.getPoints(12);
-      const shifted = pts.map(p => new THREE.Vector2(p.x + bXOffset, p.y + bYOffset));
-      const s = new THREE.Shape(shifted);
-      for (const hole of shape.holes) {
-        const hPts = hole.getPoints(12);
-        s.holes.push(new THREE.Path(hPts.map(p => new THREE.Vector2(p.x + bXOffset, p.y + bYOffset))));
-      }
-      bottomShapes.push(s);
-    }
-
-    for (const shape of ld.topLineShapes) {
-      const pts = shape.getPoints(12);
-      const shifted = pts.map(p => new THREE.Vector2(p.x + tXOffset, p.y + tYOffset));
-      const s = new THREE.Shape(shifted);
-      for (const hole of shape.holes) {
-        const hPts = hole.getPoints(12);
-        s.holes.push(new THREE.Path(hPts.map(p => new THREE.Vector2(p.x + tXOffset, p.y + tYOffset))));
-      }
-      topShapes.push(s);
-    }
-
+    const dx = -ld.cx;
+    const dy = lineY - ld.cy;
+    allBottomShapes.push(...shiftShapes(ld.bottomShapes, dx, dy));
+    allTopShapes.push(...shiftShapes(ld.topShapes, dx, dy));
     cursorY -= ld.height;
-    if (i < lineData.length - 1) {
-      cursorY -= ld.height * (lineSpacing - 1) * 0.5;
-    }
   }
 
-  if (bottomShapes.length === 0) return null;
+  if (allBottomShapes.length === 0) return null;
 
   const bottomMat = outlineBottomColor
     ? new THREE.MeshStandardMaterial({ color: new THREE.Color(outlineBottomColor), metalness: 0.9, roughness: 0.35, envMapIntensity: 1.0 })
     : material.clone();
   if (!outlineBottomColor) bottomMat.roughness += 0.1;
-  const bottomGeo = new THREE.ExtrudeGeometry(bottomShapes, {
+  const bottomGeo = new THREE.ExtrudeGeometry(allBottomShapes, {
     depth: outlineBaseDepth,
     bevelEnabled: false
   });
@@ -583,11 +632,11 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
   bottomMesh.userData.hasLineColor = true;
   group.add(bottomMesh);
 
-  if (topShapes.length > 0 && outlineRaisedDepth > 0) {
+  if (allTopShapes.length > 0 && outlineRaisedDepth > 0) {
     const topMat = outlineTopColor
       ? new THREE.MeshStandardMaterial({ color: new THREE.Color(outlineTopColor), metalness: 0.9, roughness: 0.25, envMapIntensity: 1.0 })
       : material.clone();
-    const topGeo = new THREE.ExtrudeGeometry(topShapes, {
+    const topGeo = new THREE.ExtrudeGeometry(allTopShapes, {
       depth: outlineBaseDepth + outlineRaisedDepth,
       bevelEnabled: false
     });
