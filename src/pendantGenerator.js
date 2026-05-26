@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FONTS, MATERIALS, SCRIPT_FONTS } from './constants.js';
+import ClipperLib from 'clipper-lib';
 
 const fontCache = {};
 
@@ -521,10 +522,10 @@ function shapeBounds(shapes) {
 function shiftShapes(shapes, dx, dy) {
   const result = [];
   for (const shape of shapes) {
-    const pts = shape.getPoints(12);
+    const pts = shape.getPoints(48);
     const s = new THREE.Shape(pts.map(p => new THREE.Vector2(p.x + dx, p.y + dy)));
     for (const hole of shape.holes) {
-      const hPts = hole.getPoints(12);
+      const hPts = hole.getPoints(48);
       s.holes.push(new THREE.Path(hPts.map(p => new THREE.Vector2(p.x + dx, p.y + dy))));
     }
     result.push(s);
@@ -532,91 +533,49 @@ function shiftShapes(shapes, dx, dy) {
   return result;
 }
 
-function signedArea(points) {
-  let area = 0;
-  for (let i = 0, n = points.length; i < n; i++) {
-    const j = (i + 1) % n;
-    area += points[i].x * points[j].y - points[j].x * points[i].y;
-  }
-  return area / 2;
-}
-
-function offsetContour(points, amount) {
-  const n = points.length;
-  if (n < 3) return points;
-
-  // Remove duplicate consecutive points
-  const pts = [points[0]];
-  for (let i = 1; i < n; i++) {
-    const dx = points[i].x - pts[pts.length - 1].x;
-    const dy = points[i].y - pts[pts.length - 1].y;
-    if (dx * dx + dy * dy > 1e-10) pts.push(points[i]);
-  }
-  if (pts.length < 3) return points;
-
-  const area = signedArea(pts);
-  const dir = area >= 0 ? 1 : -1;
-  const m = pts.length;
-
-  const result = [];
-  for (let i = 0; i < m; i++) {
-    const prev = pts[(i - 1 + m) % m];
-    const curr = pts[i];
-    const next = pts[(i + 1) % m];
-
-    const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
-    const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
-    const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-    const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-    if (len1 < 1e-8 || len2 < 1e-8) {
-      result.push({ x: curr.x, y: curr.y });
-      continue;
-    }
-
-    const n1x = -dy1 / len1, n1y = dx1 / len1;
-    const n2x = -dy2 / len2, n2y = dx2 / len2;
-
-    let bx = n1x + n2x, by = n1y + n2y;
-    const blen = Math.sqrt(bx * bx + by * by);
-    if (blen < 0.001) { bx = n1x; by = n1y; }
-    else { bx /= blen; by /= blen; }
-
-    const dot = n1x * bx + n1y * by;
-    const miter = Math.min(Math.abs(dot) > 0.15 ? 1 / dot : 2, 3);
-    const offset = amount * dir * miter;
-
-    const px = curr.x + bx * offset;
-    const py = curr.y + by * offset;
-    if (!isFinite(px) || !isFinite(py)) {
-      result.push({ x: curr.x, y: curr.y });
-      continue;
-    }
-    result.push({ x: px, y: py });
-  }
-  return result;
-}
+const CLIP_SCALE = 1000;
 
 function offsetShapes(shapes, amount) {
-  const result = [];
+  const paths = [];
   for (const shape of shapes) {
-    const outerPts = shape.getPoints(12);
-    const trial = offsetContour(outerPts, amount);
-    if (trial.length < 3) continue;
-
-    const origArea = Math.abs(signedArea(outerPts));
-    const trialArea = Math.abs(signedArea(trial));
-    const expanded = trialArea > origArea ? trial : offsetContour(outerPts, -amount);
-    if (expanded.length < 3) continue;
-
-    const s = new THREE.Shape(expanded.map(p => new THREE.Vector2(p.x, p.y)));
+    const outerPts = shape.getPoints(48);
+    const clipPath = outerPts.map(p => ({ X: Math.round(p.x * CLIP_SCALE), Y: Math.round(p.y * CLIP_SCALE) }));
+    if (clipPath.length >= 3) paths.push(clipPath);
     for (const hole of shape.holes) {
-      const holePts = hole.getPoints(12);
-      const hTrial = offsetContour(holePts, amount);
-      const hOrigArea = Math.abs(signedArea(holePts));
-      const hTrialArea = Math.abs(signedArea(hTrial));
-      const shrunk = hTrialArea < hOrigArea ? hTrial : offsetContour(holePts, -amount);
-      if (shrunk.length >= 3) {
-        s.holes.push(new THREE.Path(shrunk.map(p => new THREE.Vector2(p.x, p.y))));
+      const holePts = hole.getPoints(48);
+      const hPath = holePts.map(p => ({ X: Math.round(p.x * CLIP_SCALE), Y: Math.round(p.y * CLIP_SCALE) }));
+      if (hPath.length >= 3) paths.push(hPath);
+    }
+  }
+
+  if (paths.length === 0) return [];
+
+  const co = new ClipperLib.ClipperOffset();
+  co.ArcTolerance = CLIP_SCALE * 0.05;
+  co.AddPaths(paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+  const solution = [];
+  co.Execute(solution, amount * CLIP_SCALE);
+
+  if (solution.length === 0) return [];
+
+  const outers = [];
+  const holes = [];
+  for (const path of solution) {
+    const area = ClipperLib.Clipper.Area(path);
+    if (area > 0) outers.push(path);
+    else if (area < 0) holes.push(path);
+  }
+
+  const result = [];
+  for (const outer of outers) {
+    const pts = outer.map(p => new THREE.Vector2(p.X / CLIP_SCALE, p.Y / CLIP_SCALE));
+    const s = new THREE.Shape(pts);
+    for (const hole of holes) {
+      const hb = ClipperLib.Clipper.GetBounds([hole]);
+      const ob = ClipperLib.Clipper.GetBounds([outer]);
+      if (hb.left >= ob.left && hb.right <= ob.right && hb.top >= ob.top && hb.bottom <= ob.bottom) {
+        const hPts = hole.map(p => new THREE.Vector2(p.X / CLIP_SCALE, p.Y / CLIP_SCALE));
+        s.holes.push(new THREE.Path(hPts));
       }
     }
     result.push(s);
