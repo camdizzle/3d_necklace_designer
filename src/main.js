@@ -85,9 +85,9 @@ async function init() {
       innerTopY: chain.innerTopY,
       innerBottomY: chain.innerBottomY,
       bailHeight: chain.bailHeight,
+      chainThickness: chain.chainThickness,
       bailZCenter: chain.bailZCenter,
-      bailXCenter: chain.bailXCenter,
-      chainThickness: chain.chainThickness
+      bailXCenter: chain.bailXCenter
     };
     scene.add(chainMesh);
 
@@ -165,9 +165,9 @@ async function rebuildPendant(state) {
     innerTopY: chainInfo.innerTopY * scale,
     innerBottomY: chainInfo.innerBottomY * scale,
     bailHeight: chainInfo.bailHeight * scale,
-    bailZCenter: chainInfo.bailZCenter * scale,
-    bailXCenter: chainInfo.bailXCenter * scale,
-    chainThickness: chainInfo.chainThickness * scale
+    chainThickness: chainInfo.chainThickness * scale,
+    bailZCenter: (chainInfo.bailZCenter || 0) * scale,
+    bailXCenter: (chainInfo.bailXCenter || 0) * scale
   } : null;
 
   const result = await generatePendant({
@@ -218,7 +218,10 @@ async function rebuildPendant(state) {
     lineColor3: state.lineColor3,
     lockedPlateW: state.lockPendantSize ? state.lockedPlateW : null,
     lockedPlateH: state.lockPendantSize ? state.lockedPlateH : null,
-    chainType: state.chainType
+    chainType: state.chainType,
+    outlineBaseDepth: state.outlineBaseDepth,
+    outlineRaisedDepth: state.outlineRaisedDepth,
+    outlineStrokeWidth: state.outlineStrokeWidth
   }, getMaterialOpts(state), scaledChainInfo);
 
   if (!result) return;
@@ -302,9 +305,9 @@ const state = initUI(async (newState, changedKey) => {
         innerTopY: chain.innerTopY,
         innerBottomY: chain.innerBottomY,
         bailHeight: chain.bailHeight,
+        chainThickness: chain.chainThickness,
         bailZCenter: chain.bailZCenter,
-        bailXCenter: chain.bailXCenter,
-        chainThickness: chain.chainThickness
+        bailXCenter: chain.bailXCenter
       };
       chainMesh.scale.setScalar(newState.chainScale);
       chainMesh.visible = !newState.hideChain;
@@ -846,17 +849,19 @@ document.getElementById('clear-relief')?.addEventListener('click', async () => {
   await rebuildPendant(state);
 });
 
-// Hide corner radius slider for non-rectangle shapes
+// Hide corner radius slider for non-rectangle shapes and toggle outline controls
 const cornerRadiusGroup = document.getElementById('plate-radius')?.closest('.control-group');
-function updateCornerRadiusVisibility() {
-  if (!cornerRadiusGroup) return;
-  cornerRadiusGroup.style.display = state.pendantShape === 'rectangle' ? '' : 'none';
+const outlineControlsEl = document.getElementById('outline-controls');
+function updateShapeVisibility() {
+  const isOutline = state.pendantShape === 'outline';
+  if (cornerRadiusGroup) cornerRadiusGroup.style.display = state.pendantShape === 'rectangle' ? '' : 'none';
+  if (outlineControlsEl) outlineControlsEl.style.display = isOutline ? '' : 'none';
 }
 const shapeSelectEl = document.getElementById('shape-select');
 if (shapeSelectEl) {
-  shapeSelectEl.addEventListener('change', () => setTimeout(updateCornerRadiusVisibility, 0));
+  shapeSelectEl.addEventListener('change', () => setTimeout(updateShapeVisibility, 0));
 }
-updateCornerRadiusVisibility();
+updateShapeVisibility();
 
 // --- Undo/Redo ---
 let undoRedoActive = false;

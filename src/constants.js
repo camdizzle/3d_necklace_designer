@@ -140,6 +140,11 @@ export const DEFAULTS = {
   lockedPlateW: null,
   lockedPlateH: null,
 
+  // Outline plate
+  outlineBaseDepth: 13,
+  outlineRaisedDepth: 2,
+  outlineStrokeWidth: 3,
+
   // Pendant position
   pendantScale: 1.0,
   pendantOffsetX: 0,
