@@ -10,7 +10,6 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "clipper-lib": "^6.4.2",
     "express": "^4.21.0",
     "stripe": "^17.0.0",
     "three": "^0.170.0"

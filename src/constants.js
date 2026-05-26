@@ -103,7 +103,7 @@ export const OUTLINE_FONTS = [
 export const DEFAULTS = {
   // Line 1
   text: 'Test',
-  font: 'helvetiker_bold',
+  font: 'coiny',
   textSize: 24,
   textCurve: 0,
   textOffsetX: 0,
@@ -153,7 +153,7 @@ export const DEFAULTS = {
   platePadding: 8,
   plateRadius: 5,
   plateThickness: 5.5,
-  pendantShape: 'rectangle',
+  pendantShape: 'outline',
   engrave: false,
   borderWidth: 0,
   customShapePoints: null,
@@ -162,17 +162,17 @@ export const DEFAULTS = {
   lockedPlateH: null,
 
   // Outline plate
-  outlineBaseDepth: 13,
+  outlineBaseDepth: 8,
   outlineRaisedDepth: 2,
-  outlineWidth: 1.5,
+  outlineWidth: 4.5,
   outlineBottomColor: '#000000',
   outlineTopColor: null,
 
   // Pendant position
   pendantScale: 1.0,
   pendantOffsetX: 0,
-  pendantOffsetY: 0,
-  pendantOffsetZ: -2,
+  pendantOffsetY: 4,
+  pendantOffsetZ: 0,
 
   // Chain
   chainType: 'rope',
