@@ -407,6 +407,243 @@ export function createMaterial(materialKey, opts = {}) {
   });
 }
 
+function offsetContour(points, amount) {
+  const result = [];
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const prev = points[(i - 1 + n) % n];
+    const curr = points[i];
+    const next = points[(i + 1) % n];
+    const e1x = curr.x - prev.x, e1y = curr.y - prev.y;
+    const e2x = next.x - curr.x, e2y = next.y - curr.y;
+    const len1 = Math.sqrt(e1x * e1x + e1y * e1y) || 1;
+    const len2 = Math.sqrt(e2x * e2x + e2y * e2y) || 1;
+    const n1x = -e1y / len1, n1y = e1x / len1;
+    const n2x = -e2y / len2, n2y = e2x / len2;
+    let nx = n1x + n2x, ny = n1y + n2y;
+    const nLen = Math.sqrt(nx * nx + ny * ny) || 1;
+    nx /= nLen;
+    ny /= nLen;
+    const dot = n1x * nx + n1y * ny;
+    const miterLen = dot > 0.1 ? amount / dot : amount;
+    const clamped = Math.sign(miterLen) * Math.min(Math.abs(miterLen), Math.abs(amount) * 3);
+    result.push(new THREE.Vector2(curr.x + nx * clamped, curr.y + ny * clamped));
+  }
+  return result;
+}
+
+function contourArea(points) {
+  let area = 0;
+  for (let i = 0, n = points.length; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
+  }
+  return area / 2;
+}
+
+function generateShapesWithSpacing(font, text, size, spacing, preserveCase) {
+  const displayText = preserveCase ? text : text.toUpperCase();
+  const data = font.data;
+  const scale = size / data.resolution;
+  const allShapes = [];
+  let offsetX = 0;
+
+  for (const char of displayText) {
+    if (char === ' ') {
+      offsetX += size * 0.3 + spacing;
+      continue;
+    }
+    const glyph = data.glyphs[char] || data.glyphs['?'];
+    if (!glyph) continue;
+
+    const path = new THREE.ShapePath();
+    if (glyph.o) {
+      const outline = glyph._cachedOutline || (glyph._cachedOutline = glyph.o.split(' '));
+      let x, y, cpx, cpy, cpx1, cpy1, cpx2, cpy2;
+      for (let i = 0, l = outline.length; i < l;) {
+        const action = outline[i++];
+        switch (action) {
+          case 'm':
+            x = outline[i++] * scale + offsetX;
+            y = outline[i++] * scale;
+            path.moveTo(x, y);
+            break;
+          case 'l':
+            x = outline[i++] * scale + offsetX;
+            y = outline[i++] * scale;
+            path.lineTo(x, y);
+            break;
+          case 'q':
+            cpx = outline[i++] * scale + offsetX;
+            cpy = outline[i++] * scale;
+            x = outline[i++] * scale + offsetX;
+            y = outline[i++] * scale;
+            path.quadraticCurveTo(cpx, cpy, x, y);
+            break;
+          case 'b':
+            cpx1 = outline[i++] * scale + offsetX;
+            cpy1 = outline[i++] * scale;
+            cpx2 = outline[i++] * scale + offsetX;
+            cpy2 = outline[i++] * scale;
+            x = outline[i++] * scale + offsetX;
+            y = outline[i++] * scale;
+            path.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x, y);
+            break;
+        }
+      }
+    }
+    const charShapes = path.toShapes();
+    allShapes.push(...charShapes);
+    offsetX += (glyph.ha || 0) * scale + spacing;
+  }
+  return allShapes;
+}
+
+function generateOutlinePendant(lines, material, materialOpts, opts) {
+  const {
+    outlineBaseDepth, outlineRaisedDepth, outlineStrokeWidth,
+    lineSpacing, chainInfo, chainType
+  } = opts;
+
+  const group = new THREE.Group();
+  group.name = 'pendant';
+
+  const allBaseShapes = [];
+  const allOutlineShapes = [];
+  let totalH = 0;
+  const lineData = [];
+
+  for (const line of lines) {
+    if (!line.text) continue;
+    const font = fontCache[line.fontKey];
+    if (!font) continue;
+    const renderOpts = getTextRenderOpts(line.fontKey, line.size);
+    const shapes = generateShapesWithSpacing(font, line.text, line.size, line.letterSpacing || 0, renderOpts.preserveCase);
+    if (shapes.length === 0) continue;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const s of shapes) {
+      const pts = s.getPoints(8);
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    lineData.push({ shapes, minX, maxX, minY, maxY, height: maxY - minY });
+    totalH += maxY - minY;
+  }
+
+  if (lineData.length === 0) return null;
+
+  totalH += (lineData.length - 1) * lineData[0].height * (lineSpacing - 1) * 0.5;
+
+  let cursorY = totalH / 2;
+  for (let i = 0; i < lineData.length; i++) {
+    const ld = lineData[i];
+    const centerX = (ld.minX + ld.maxX) / 2;
+    const centerY = (ld.minY + ld.maxY) / 2;
+    const yOffset = cursorY - ld.height / 2 - centerY;
+    const xOffset = -centerX;
+
+    for (const shape of ld.shapes) {
+      const outerPts = shape.getPoints(12);
+      const shiftedOuter = outerPts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
+
+      const baseShape = new THREE.Shape(shiftedOuter);
+      for (const hole of shape.holes) {
+        const holePts = hole.getPoints(12);
+        const shiftedHole = holePts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
+        baseShape.holes.push(new THREE.Path(shiftedHole));
+      }
+      allBaseShapes.push(baseShape);
+
+      const insetPts = offsetContour(shiftedOuter, -outlineStrokeWidth);
+      const insetArea = contourArea(insetPts);
+      const outerArea = contourArea(shiftedOuter);
+      if (Math.abs(insetArea) > Math.abs(outerArea) * 0.05) {
+        const outlineShape = new THREE.Shape(shiftedOuter);
+        const insetWinding = insetArea > 0 ? insetPts.slice().reverse() : insetPts;
+        outlineShape.holes.push(new THREE.Path(insetWinding));
+        for (const hole of shape.holes) {
+          const holePts = hole.getPoints(12);
+          const shiftedHole = holePts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
+          outlineShape.holes.push(new THREE.Path(shiftedHole));
+        }
+        allOutlineShapes.push(outlineShape);
+      }
+
+      for (const hole of shape.holes) {
+        const holePts = hole.getPoints(12);
+        const shiftedHole = holePts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
+        const outsetPts = offsetContour(shiftedHole, outlineStrokeWidth);
+        const outsetArea = contourArea(outsetPts);
+        const holeArea = contourArea(shiftedHole);
+        if (Math.abs(outsetArea) > Math.abs(holeArea) * 0.05) {
+          const outerWinding = outsetArea < 0 ? outsetPts.slice().reverse() : outsetPts;
+          const holeRingShape = new THREE.Shape(outerWinding);
+          const innerWinding = holeArea > 0 ? shiftedHole.slice().reverse() : shiftedHole;
+          holeRingShape.holes.push(new THREE.Path(innerWinding));
+          allOutlineShapes.push(holeRingShape);
+        }
+      }
+    }
+
+    cursorY -= ld.height;
+    if (i < lineData.length - 1) {
+      cursorY -= ld.height * (lineSpacing - 1) * 0.5;
+    }
+  }
+
+  if (allBaseShapes.length === 0) return null;
+
+  const baseGeo = new THREE.ExtrudeGeometry(allBaseShapes, {
+    depth: outlineBaseDepth,
+    bevelEnabled: false
+  });
+  const baseMesh = new THREE.Mesh(baseGeo, material.clone());
+  baseMesh.material.roughness += 0.1;
+  group.add(baseMesh);
+
+  if (allOutlineShapes.length > 0 && outlineRaisedDepth > 0) {
+    const outlineGeo = new THREE.ExtrudeGeometry(allOutlineShapes, {
+      depth: outlineBaseDepth + outlineRaisedDepth,
+      bevelEnabled: false
+    });
+    const outlineMesh = new THREE.Mesh(outlineGeo, material.clone());
+    group.add(outlineMesh);
+  }
+
+  const box = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  group.children.forEach(child => {
+    child.position.x -= center.x;
+    child.position.y -= center.y;
+  });
+
+  const plateW = size.x;
+  const plateH = size.y;
+  const topShift = plateH / 2;
+  group.children.forEach(child => {
+    child.position.y -= topShift;
+  });
+
+  if (chainInfo) {
+    const { innerTopY, bailHeight, bailZCenter, bailXCenter } = chainInfo;
+    const hasBail = chainType === 'cuban' || chainType === 'twisted-star';
+    const pendantCenterY = hasBail ? innerTopY + bailHeight - 3 : innerTopY;
+    const totalDepth = outlineBaseDepth + outlineRaisedDepth;
+    const defaultZ = hasBail ? -(totalDepth / 2) + bailZCenter : -(totalDepth / 2);
+    const defaultX = hasBail ? (bailXCenter || 0) : 0;
+    return { group, width: plateW, height: plateH, rawW: plateW, rawH: plateH, pendantCenterY, defaultZ, defaultX };
+  }
+
+  return { group, width: plateW, height: plateH, rawW: plateW, rawH: plateH, pendantCenterY: 0, defaultZ: -(outlineBaseDepth + outlineRaisedDepth) / 2, defaultX: 0 };
+}
+
 export async function generatePendant(params, materialOpts = {}, chainInfo = null) {
   const {
     text,
@@ -456,7 +693,10 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     lineColor3 = null,
     lockedPlateW = null,
     lockedPlateH = null,
-    chainType = 'rope'
+    chainType = 'rope',
+    outlineBaseDepth = 13,
+    outlineRaisedDepth = 2,
+    outlineStrokeWidth = 3
   } = params;
 
   // Custom STL replaces the entire plate+text pendant
@@ -571,6 +811,16 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
   const hasImage = reliefData && reliefData.data;
 
   if (!hasText && !hasImage) return null;
+
+  if (pendantShape === 'outline' && hasText) {
+    const material = createMaterial(materialOpts.key || 'gold', materialOpts);
+    const fontsNeeded = [...new Set(lines.map(l => l.fontKey))];
+    await Promise.all(fontsNeeded.map(fk => loadFont(fk)));
+    return generateOutlinePendant(lines, material, materialOpts, {
+      outlineBaseDepth, outlineRaisedDepth, outlineStrokeWidth,
+      lineSpacing, chainInfo, chainType
+    });
+  }
 
   const group = new THREE.Group();
   group.name = 'pendant';
@@ -909,42 +1159,21 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     group.add(reliefMesh);
   }
 
-  // Pendant ring (bail loop) — attached to top of plate for chain to pass through.
-  // Skipped for cuban chain which connects directly.
-  let ringHeight = 0;
-  if (chainType !== 'cuban' && chainType !== 'twisted-star') {
-    const ringRadius = 4;
-    const tubeRadius = 1.2;
-    const ringGeo = new THREE.TorusGeometry(ringRadius, tubeRadius, 12, 24);
-    // Orient ring so the hole faces left-right (chain passes through along X)
-    ringGeo.rotateY(Math.PI / 2);
-    const ringMesh = new THREE.Mesh(ringGeo, material.clone());
-    const ringTopY = plateH / 2 + (borderWidth > 0 ? borderWidth : 0);
-    ringMesh.position.set(0, ringTopY + ringRadius, 0);
-    // Center the ring in Z to align with the plate
-    const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
-    const backZ = -0.5;
-    ringMesh.position.z = (frontZ + backZ) / 2;
-    group.add(ringMesh);
-    ringHeight = ringRadius * 2 + tubeRadius;
-  }
-
-  // Anchor pendant from top edge: shift all children so group origin = top center.
-  // Account for border extending above the plate and the ring above that.
-  const topShift = plateH / 2 + (borderWidth > 0 ? borderWidth : 0) + ringHeight;
+  const topShift = plateH / 2 + (borderWidth > 0 ? borderWidth : 0);
   group.children.forEach(child => {
     child.position.y -= topShift;
   });
 
   if (chainInfo) {
-    const { innerTopY } = chainInfo;
-
-    // The pendant's ring sits at the top of the chain gap
-    const pendantCenterY = innerTopY;
+    const { innerTopY, bailHeight, bailZCenter, bailXCenter } = chainInfo;
+    const hasBail = chainType === 'cuban' || chainType === 'twisted-star';
+    const pendantCenterY = hasBail ? innerTopY + bailHeight - 3 : innerTopY;
 
     const frontZ = borderWidth > 0 ? plateThickness - 0.5 + 2 : plateThickness - 0.5;
     const backZ = -0.5;
-    const defaultZ = -(frontZ + backZ) / 2;
+    const baseZ = -(frontZ + backZ) / 2;
+    const defaultZ = hasBail ? baseZ + bailZCenter : baseZ;
+    const defaultX = hasBail ? (bailXCenter || 0) : 0;
 
     return {
       group,
@@ -953,7 +1182,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
       rawW,
       rawH,
       pendantCenterY,
-      defaultZ
+      defaultZ,
+      defaultX
     };
   }
 
@@ -964,7 +1194,8 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     rawW,
     rawH,
     pendantCenterY: 0,
-    defaultZ: 0
+    defaultZ: 0,
+    defaultX: 0
   };
 }
 

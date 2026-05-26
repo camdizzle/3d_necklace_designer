@@ -259,6 +259,9 @@ export function initUI(onChange) {
   bindSlider('plate-padding', 'platePadding', parseInt);
   bindSlider('plate-radius', 'plateRadius', parseInt);
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
+  bindSlider('outline-base-depth', 'outlineBaseDepth', parseFloat);
+  bindSlider('outline-raised-depth', 'outlineRaisedDepth', parseFloat);
+  bindSlider('outline-stroke-width', 'outlineStrokeWidth', parseFloat);
   // Border is premium: intercept on input/change so any non-zero value gates.
   const borderSlider = document.getElementById('border-width');
   const borderVal = document.getElementById('border-width-val');
@@ -411,6 +414,9 @@ export function initUI(onChange) {
     'plate-padding': 'platePadding',
     'plate-radius': 'plateRadius',
     'plate-thickness': 'plateThickness',
+    'outline-base-depth': 'outlineBaseDepth',
+    'outline-raised-depth': 'outlineRaisedDepth',
+    'outline-stroke-width': 'outlineStrokeWidth',
     'border-width': 'borderWidth',
     'pendant-scale': 'pendantScale',
     'pendant-offset-x': 'pendantOffsetX',
