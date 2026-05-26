@@ -635,5 +635,7 @@ export function initUI(onChange) {
   refreshProStatus();
   window.addEventListener('pro-state-change', refreshProStatus);
 
+  syncUIFromState();
+
   return state;
 }
