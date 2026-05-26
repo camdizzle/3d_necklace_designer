@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FONTS, MATERIALS, SCRIPT_FONTS } from './constants.js';
-import ClipperLib from 'clipper-lib';
+import ClipperLib from './lib/clipper.js';
 
 const fontCache = {};
 
@@ -764,9 +764,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     lockedPlateW = null,
     lockedPlateH = null,
     chainType = 'rope',
-    outlineBaseDepth = 13,
+    outlineBaseDepth = 8,
     outlineRaisedDepth = 2,
-    outlineWidth = 1.5,
+    outlineWidth = 4.5,
     outlineBottomColor = '#000000',
     outlineTopColor = null
   } = params;
