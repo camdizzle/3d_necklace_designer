@@ -164,7 +164,7 @@ export const DEFAULTS = {
   // Outline plate
   outlineBaseDepth: 13,
   outlineRaisedDepth: 2,
-  outlineScale: 1.2,
+  outlineScale: 1.5,
 
   // Pendant position
   pendantScale: 1.0,

@@ -531,12 +531,13 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     const ld = lineData[i];
     const bCenterX = (ld.bMinX + ld.bMaxX) / 2;
     const bCenterY = (ld.bMinY + ld.bMaxY) / 2;
-    const bYOffset = cursorY - ld.height / 2 - bCenterY;
+    const lineY = cursorY - ld.height / 2;
+    const bYOffset = lineY - bCenterY;
     const bXOffset = -bCenterX;
 
     const tCenterX = (ld.tMinX + ld.tMaxX) / 2;
     const tCenterY = (ld.tMinY + ld.tMaxY) / 2;
-    const tYOffset = cursorY - ld.height / 2 - bCenterY;
+    const tYOffset = lineY - tCenterY;
     const tXOffset = -tCenterX;
 
     for (const shape of ld.bottomLineShapes) {
