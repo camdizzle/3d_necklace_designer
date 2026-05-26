@@ -553,7 +553,8 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     const renderOpts = getTextRenderOpts(line.fontKey, line.size);
     const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
     const data = font.data;
-    const topScale = line.size / data.resolution;
+    const topScale = (line.size * 1.3) / data.resolution;
+    const baseScale = line.size / data.resolution;
     const bottomScale = (line.size * outlineScale) / data.resolution;
     const spacing = line.letterSpacing || 0;
 
@@ -584,7 +585,7 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
         charTopShapes.push(...topShapes);
       }
 
-      cursor += (glyph.ha || 0) * topScale + spacing;
+      cursor += (glyph.ha || 0) * baseScale + spacing;
     }
 
     if (charTopShapes.length === 0) continue;
@@ -637,10 +638,11 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
       ? new THREE.MeshStandardMaterial({ color: new THREE.Color(outlineTopColor), metalness: 0.9, roughness: 0.25, envMapIntensity: 1.0 })
       : material.clone();
     const topGeo = new THREE.ExtrudeGeometry(allTopShapes, {
-      depth: outlineBaseDepth + outlineRaisedDepth,
+      depth: outlineRaisedDepth,
       bevelEnabled: false
     });
     const topMesh = new THREE.Mesh(topGeo, topMat);
+    topMesh.position.z = outlineBaseDepth;
     if (outlineTopColor) topMesh.userData.hasLineColor = true;
     group.add(topMesh);
   }
