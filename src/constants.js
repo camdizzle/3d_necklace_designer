@@ -43,7 +43,15 @@ export const FONTS = {
   sacramento: 'fonts/sacramento.typeface.json',
   tangerine: 'fonts/tangerine.typeface.json',
   alex_brush: 'fonts/alex_brush.typeface.json',
-  kaushan_script: 'fonts/kaushan_script.typeface.json'
+  kaushan_script: 'fonts/kaushan_script.typeface.json',
+  coiny: 'fonts/coiny.typeface.json',
+  chewy: 'fonts/chewy.typeface.json',
+  sour_gummy: 'fonts/sour_gummy.typeface.json',
+  dynapuff: 'fonts/dynapuff.typeface.json',
+  carter_one: 'fonts/carter_one.typeface.json',
+  bubblegum_sans: 'fonts/bubblegum_sans.typeface.json',
+  archivo_black: 'fonts/archivo_black.typeface.json',
+  alkatra: 'fonts/alkatra.typeface.json'
 };
 
 // Script/cursive fonts — rendered with preserved case, finer curves, smaller bevels
@@ -76,8 +84,21 @@ export const FONT_LABELS = {
   sacramento: 'Sacramento ✦',
   tangerine: 'Tangerine ✦',
   alex_brush: 'Alex Brush ✦',
-  kaushan_script: 'Kaushan Script ✦'
+  kaushan_script: 'Kaushan Script ✦',
+  coiny: 'Coiny',
+  chewy: 'Chewy',
+  sour_gummy: 'Sour Gummy',
+  dynapuff: 'DynaPuff',
+  carter_one: 'Carter One',
+  bubblegum_sans: 'Bubblegum Sans',
+  archivo_black: 'Archivo Black',
+  alkatra: 'Alkatra'
 };
+
+export const OUTLINE_FONTS = [
+  'coiny', 'chewy', 'sour_gummy', 'dynapuff',
+  'carter_one', 'bubblegum_sans', 'archivo_black', 'alkatra'
+];
 
 export const DEFAULTS = {
   // Line 1
@@ -143,7 +164,7 @@ export const DEFAULTS = {
   // Outline plate
   outlineBaseDepth: 13,
   outlineRaisedDepth: 2,
-  outlineStrokeWidth: 3,
+  outlineScale: 1.2,
 
   // Pendant position
   pendantScale: 1.0,

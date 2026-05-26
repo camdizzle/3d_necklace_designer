@@ -407,41 +407,6 @@ export function createMaterial(materialKey, opts = {}) {
   });
 }
 
-function offsetContour(points, amount) {
-  const result = [];
-  const n = points.length;
-  for (let i = 0; i < n; i++) {
-    const prev = points[(i - 1 + n) % n];
-    const curr = points[i];
-    const next = points[(i + 1) % n];
-    const e1x = curr.x - prev.x, e1y = curr.y - prev.y;
-    const e2x = next.x - curr.x, e2y = next.y - curr.y;
-    const len1 = Math.sqrt(e1x * e1x + e1y * e1y) || 1;
-    const len2 = Math.sqrt(e2x * e2x + e2y * e2y) || 1;
-    const n1x = -e1y / len1, n1y = e1x / len1;
-    const n2x = -e2y / len2, n2y = e2x / len2;
-    let nx = n1x + n2x, ny = n1y + n2y;
-    const nLen = Math.sqrt(nx * nx + ny * ny) || 1;
-    nx /= nLen;
-    ny /= nLen;
-    const dot = n1x * nx + n1y * ny;
-    const miterLen = dot > 0.1 ? amount / dot : amount;
-    const clamped = Math.sign(miterLen) * Math.min(Math.abs(miterLen), Math.abs(amount) * 3);
-    result.push(new THREE.Vector2(curr.x + nx * clamped, curr.y + ny * clamped));
-  }
-  return result;
-}
-
-function contourArea(points) {
-  let area = 0;
-  for (let i = 0, n = points.length; i < n; i++) {
-    const j = (i + 1) % n;
-    area += points[i].x * points[j].y;
-    area -= points[j].x * points[i].y;
-  }
-  return area / 2;
-}
-
 function generateShapesWithSpacing(font, text, size, spacing, preserveCase) {
   const displayText = preserveCase ? text : text.toUpperCase();
   const data = font.data;
@@ -502,15 +467,15 @@ function generateShapesWithSpacing(font, text, size, spacing, preserveCase) {
 
 function generateOutlinePendant(lines, material, materialOpts, opts) {
   const {
-    outlineBaseDepth, outlineRaisedDepth, outlineStrokeWidth,
+    outlineBaseDepth, outlineRaisedDepth, outlineScale,
     lineSpacing, chainInfo, chainType
   } = opts;
 
   const group = new THREE.Group();
   group.name = 'pendant';
 
-  const allBaseShapes = [];
-  const allOutlineShapes = [];
+  const bottomShapes = [];
+  const topShapes = [];
   let totalH = 0;
   const lineData = [];
 
@@ -519,21 +484,42 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     const font = fontCache[line.fontKey];
     if (!font) continue;
     const renderOpts = getTextRenderOpts(line.fontKey, line.size);
-    const shapes = generateShapesWithSpacing(font, line.text, line.size, line.letterSpacing || 0, renderOpts.preserveCase);
-    if (shapes.length === 0) continue;
 
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const s of shapes) {
+    const topSize = line.size;
+    const bottomSize = line.size * outlineScale;
+    const sizeDelta = (bottomSize - topSize) / 2;
+
+    const topLineShapes = generateShapesWithSpacing(font, line.text, topSize, line.letterSpacing || 0, renderOpts.preserveCase);
+    const bottomLineShapes = generateShapesWithSpacing(font, line.text, bottomSize, line.letterSpacing || 0, renderOpts.preserveCase);
+    if (topLineShapes.length === 0) continue;
+
+    let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
+    for (const s of bottomLineShapes) {
       const pts = s.getPoints(8);
       for (const p of pts) {
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.y > maxY) maxY = p.y;
+        if (p.x < bMinX) bMinX = p.x;
+        if (p.x > bMaxX) bMaxX = p.x;
+        if (p.y < bMinY) bMinY = p.y;
+        if (p.y > bMaxY) bMaxY = p.y;
       }
     }
-    lineData.push({ shapes, minX, maxX, minY, maxY, height: maxY - minY });
-    totalH += maxY - minY;
+    let tMinX = Infinity, tMaxX = -Infinity, tMinY = Infinity, tMaxY = -Infinity;
+    for (const s of topLineShapes) {
+      const pts = s.getPoints(8);
+      for (const p of pts) {
+        if (p.x < tMinX) tMinX = p.x;
+        if (p.x > tMaxX) tMaxX = p.x;
+        if (p.y < tMinY) tMinY = p.y;
+        if (p.y > tMaxY) tMaxY = p.y;
+      }
+    }
+    lineData.push({
+      topLineShapes, bottomLineShapes,
+      bMinX, bMaxX, bMinY, bMaxY,
+      tMinX, tMaxX, tMinY, tMaxY,
+      height: bMaxY - bMinY
+    });
+    totalH += bMaxY - bMinY;
   }
 
   if (lineData.length === 0) return null;
@@ -543,52 +529,36 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
   let cursorY = totalH / 2;
   for (let i = 0; i < lineData.length; i++) {
     const ld = lineData[i];
-    const centerX = (ld.minX + ld.maxX) / 2;
-    const centerY = (ld.minY + ld.maxY) / 2;
-    const yOffset = cursorY - ld.height / 2 - centerY;
-    const xOffset = -centerX;
+    const bCenterX = (ld.bMinX + ld.bMaxX) / 2;
+    const bCenterY = (ld.bMinY + ld.bMaxY) / 2;
+    const bYOffset = cursorY - ld.height / 2 - bCenterY;
+    const bXOffset = -bCenterX;
 
-    for (const shape of ld.shapes) {
-      const outerPts = shape.getPoints(12);
-      const shiftedOuter = outerPts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
+    const tCenterX = (ld.tMinX + ld.tMaxX) / 2;
+    const tCenterY = (ld.tMinY + ld.tMaxY) / 2;
+    const tYOffset = cursorY - ld.height / 2 - bCenterY;
+    const tXOffset = -tCenterX;
 
-      const baseShape = new THREE.Shape(shiftedOuter);
+    for (const shape of ld.bottomLineShapes) {
+      const pts = shape.getPoints(12);
+      const shifted = pts.map(p => new THREE.Vector2(p.x + bXOffset, p.y + bYOffset));
+      const s = new THREE.Shape(shifted);
       for (const hole of shape.holes) {
-        const holePts = hole.getPoints(12);
-        const shiftedHole = holePts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
-        baseShape.holes.push(new THREE.Path(shiftedHole));
+        const hPts = hole.getPoints(12);
+        s.holes.push(new THREE.Path(hPts.map(p => new THREE.Vector2(p.x + bXOffset, p.y + bYOffset))));
       }
-      allBaseShapes.push(baseShape);
+      bottomShapes.push(s);
+    }
 
-      const insetPts = offsetContour(shiftedOuter, -outlineStrokeWidth);
-      const insetArea = contourArea(insetPts);
-      const outerArea = contourArea(shiftedOuter);
-      if (Math.abs(insetArea) > Math.abs(outerArea) * 0.05) {
-        const outlineShape = new THREE.Shape(shiftedOuter);
-        const insetWinding = insetArea > 0 ? insetPts.slice().reverse() : insetPts;
-        outlineShape.holes.push(new THREE.Path(insetWinding));
-        for (const hole of shape.holes) {
-          const holePts = hole.getPoints(12);
-          const shiftedHole = holePts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
-          outlineShape.holes.push(new THREE.Path(shiftedHole));
-        }
-        allOutlineShapes.push(outlineShape);
-      }
-
+    for (const shape of ld.topLineShapes) {
+      const pts = shape.getPoints(12);
+      const shifted = pts.map(p => new THREE.Vector2(p.x + tXOffset, p.y + tYOffset));
+      const s = new THREE.Shape(shifted);
       for (const hole of shape.holes) {
-        const holePts = hole.getPoints(12);
-        const shiftedHole = holePts.map(p => new THREE.Vector2(p.x + xOffset, p.y + yOffset));
-        const outsetPts = offsetContour(shiftedHole, outlineStrokeWidth);
-        const outsetArea = contourArea(outsetPts);
-        const holeArea = contourArea(shiftedHole);
-        if (Math.abs(outsetArea) > Math.abs(holeArea) * 0.05) {
-          const outerWinding = outsetArea < 0 ? outsetPts.slice().reverse() : outsetPts;
-          const holeRingShape = new THREE.Shape(outerWinding);
-          const innerWinding = holeArea > 0 ? shiftedHole.slice().reverse() : shiftedHole;
-          holeRingShape.holes.push(new THREE.Path(innerWinding));
-          allOutlineShapes.push(holeRingShape);
-        }
+        const hPts = hole.getPoints(12);
+        s.holes.push(new THREE.Path(hPts.map(p => new THREE.Vector2(p.x + tXOffset, p.y + tYOffset))));
       }
+      topShapes.push(s);
     }
 
     cursorY -= ld.height;
@@ -597,23 +567,23 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     }
   }
 
-  if (allBaseShapes.length === 0) return null;
+  if (bottomShapes.length === 0) return null;
 
-  const baseGeo = new THREE.ExtrudeGeometry(allBaseShapes, {
+  const bottomGeo = new THREE.ExtrudeGeometry(bottomShapes, {
     depth: outlineBaseDepth,
     bevelEnabled: false
   });
-  const baseMesh = new THREE.Mesh(baseGeo, material.clone());
-  baseMesh.material.roughness += 0.1;
-  group.add(baseMesh);
+  const bottomMesh = new THREE.Mesh(bottomGeo, material.clone());
+  bottomMesh.material.roughness += 0.1;
+  group.add(bottomMesh);
 
-  if (allOutlineShapes.length > 0 && outlineRaisedDepth > 0) {
-    const outlineGeo = new THREE.ExtrudeGeometry(allOutlineShapes, {
+  if (topShapes.length > 0 && outlineRaisedDepth > 0) {
+    const topGeo = new THREE.ExtrudeGeometry(topShapes, {
       depth: outlineBaseDepth + outlineRaisedDepth,
       bevelEnabled: false
     });
-    const outlineMesh = new THREE.Mesh(outlineGeo, material.clone());
-    group.add(outlineMesh);
+    const topMesh = new THREE.Mesh(topGeo, material.clone());
+    group.add(topMesh);
   }
 
   const box = new THREE.Box3().setFromObject(group);
@@ -696,7 +666,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     chainType = 'rope',
     outlineBaseDepth = 13,
     outlineRaisedDepth = 2,
-    outlineStrokeWidth = 3
+    outlineScale = 1.2
   } = params;
 
   // Custom STL replaces the entire plate+text pendant
@@ -817,7 +787,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const fontsNeeded = [...new Set(lines.map(l => l.fontKey))];
     await Promise.all(fontsNeeded.map(fk => loadFont(fk)));
     return generateOutlinePendant(lines, material, materialOpts, {
-      outlineBaseDepth, outlineRaisedDepth, outlineStrokeWidth,
+      outlineBaseDepth, outlineRaisedDepth, outlineScale,
       lineSpacing, chainInfo, chainType
     });
   }
