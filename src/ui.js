@@ -1,4 +1,4 @@
-import { DEFAULTS } from './constants.js';
+import { DEFAULTS, OUTLINE_FONTS, FONT_LABELS } from './constants.js';
 import {
   isPro,
   showUpgradeModal,
@@ -261,7 +261,7 @@ export function initUI(onChange) {
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
   bindSlider('outline-base-depth', 'outlineBaseDepth', parseFloat);
   bindSlider('outline-raised-depth', 'outlineRaisedDepth', parseFloat);
-  bindSlider('outline-stroke-width', 'outlineStrokeWidth', parseFloat);
+  bindSlider('outline-scale', 'outlineScale', parseFloat);
   // Border is premium: intercept on input/change so any non-zero value gates.
   const borderSlider = document.getElementById('border-width');
   const borderVal = document.getElementById('border-width-val');
@@ -287,8 +287,41 @@ export function initUI(onChange) {
   const shapeSelect = document.getElementById('shape-select');
   gatePremiumSelect('shape-select', PREMIUM_SHAPES, FEATURES.premiumShape, (val) => {
     state.pendantShape = val;
+    updateFontSelectsForShape(val);
     onChange(state, 'pendantShape');
   });
+
+  const fontSelectIds = ['font-select', 'second-line-font', 'third-line-font'];
+  const fontStateKeys = ['font', 'secondLineFont', 'thirdLineFont'];
+  const savedNormalOptions = {};
+
+  fontSelectIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) savedNormalOptions[id] = el.innerHTML;
+  });
+
+  function updateFontSelectsForShape(shape) {
+    const isOutline = shape === 'outline';
+    fontSelectIds.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (isOutline) {
+        el.innerHTML = OUTLINE_FONTS.map(key =>
+          `<option value="${key}">${FONT_LABELS[key] || key}</option>`
+        ).join('');
+        if (!OUTLINE_FONTS.includes(state[fontStateKeys[i]])) {
+          state[fontStateKeys[i]] = OUTLINE_FONTS[0];
+        }
+        el.value = state[fontStateKeys[i]];
+      } else {
+        el.innerHTML = savedNormalOptions[id];
+        if (OUTLINE_FONTS.includes(state[fontStateKeys[i]])) {
+          state[fontStateKeys[i]] = DEFAULTS[fontStateKeys[i]];
+        }
+        el.value = state[fontStateKeys[i]];
+      }
+    });
+  }
 
   // --- Pendant position ---
   bindSlider('pendant-scale', 'pendantScale', parseFloat);
@@ -416,7 +449,7 @@ export function initUI(onChange) {
     'plate-thickness': 'plateThickness',
     'outline-base-depth': 'outlineBaseDepth',
     'outline-raised-depth': 'outlineRaisedDepth',
-    'outline-stroke-width': 'outlineStrokeWidth',
+    'outline-scale': 'outlineScale',
     'border-width': 'borderWidth',
     'pendant-scale': 'pendantScale',
     'pendant-offset-x': 'pendantOffsetX',
@@ -485,6 +518,9 @@ export function initUI(onChange) {
     if (bgColorInput) bgColorInput.value = state.backgroundColor || DEFAULTS.backgroundColor;
     colorBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.material));
     chainMatBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.chainMaterial));
+
+    // Sync font selects for outline shape
+    updateFontSelectsForShape(state.pendantShape);
 
     // Sync per-line color toggles
     [['line1-color-toggle', 'line1-color', 'line1-color-row', 'lineColor1'],
