@@ -164,7 +164,7 @@ export const DEFAULTS = {
   // Outline plate
   outlineBaseDepth: 13,
   outlineRaisedDepth: 2,
-  outlineScale: 1.5,
+  outlineWidth: 1.5,
   outlineBottomColor: '#000000',
   outlineTopColor: null,
 

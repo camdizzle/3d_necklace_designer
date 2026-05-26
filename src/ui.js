@@ -261,7 +261,7 @@ export function initUI(onChange) {
   bindSlider('plate-thickness', 'plateThickness', parseFloat);
   bindSlider('outline-base-depth', 'outlineBaseDepth', parseFloat);
   bindSlider('outline-raised-depth', 'outlineRaisedDepth', parseFloat);
-  bindSlider('outline-scale', 'outlineScale', parseFloat);
+  bindSlider('outline-scale', 'outlineWidth', parseFloat);
 
   const outlineBottomColorInput = document.getElementById('outline-bottom-color');
   if (outlineBottomColorInput) {
@@ -473,7 +473,7 @@ export function initUI(onChange) {
     'plate-thickness': 'plateThickness',
     'outline-base-depth': 'outlineBaseDepth',
     'outline-raised-depth': 'outlineRaisedDepth',
-    'outline-scale': 'outlineScale',
+    'outline-scale': 'outlineWidth',
     'border-width': 'borderWidth',
     'pendant-scale': 'pendantScale',
     'pendant-offset-x': 'pendantOffsetX',

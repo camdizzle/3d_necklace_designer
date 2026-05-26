@@ -532,9 +532,101 @@ function shiftShapes(shapes, dx, dy) {
   return result;
 }
 
+function signedArea(points) {
+  let area = 0;
+  for (let i = 0, n = points.length; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i].x * points[j].y - points[j].x * points[i].y;
+  }
+  return area / 2;
+}
+
+function offsetContour(points, amount) {
+  const n = points.length;
+  if (n < 3) return points;
+
+  // Remove duplicate consecutive points
+  const pts = [points[0]];
+  for (let i = 1; i < n; i++) {
+    const dx = points[i].x - pts[pts.length - 1].x;
+    const dy = points[i].y - pts[pts.length - 1].y;
+    if (dx * dx + dy * dy > 1e-10) pts.push(points[i]);
+  }
+  if (pts.length < 3) return points;
+
+  const area = signedArea(pts);
+  const dir = area >= 0 ? 1 : -1;
+  const m = pts.length;
+
+  const result = [];
+  for (let i = 0; i < m; i++) {
+    const prev = pts[(i - 1 + m) % m];
+    const curr = pts[i];
+    const next = pts[(i + 1) % m];
+
+    const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
+    const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
+    const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+    const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    if (len1 < 1e-8 || len2 < 1e-8) {
+      result.push({ x: curr.x, y: curr.y });
+      continue;
+    }
+
+    const n1x = -dy1 / len1, n1y = dx1 / len1;
+    const n2x = -dy2 / len2, n2y = dx2 / len2;
+
+    let bx = n1x + n2x, by = n1y + n2y;
+    const blen = Math.sqrt(bx * bx + by * by);
+    if (blen < 0.001) { bx = n1x; by = n1y; }
+    else { bx /= blen; by /= blen; }
+
+    const dot = n1x * bx + n1y * by;
+    const miter = Math.min(Math.abs(dot) > 0.15 ? 1 / dot : 2, 3);
+    const offset = amount * dir * miter;
+
+    const px = curr.x + bx * offset;
+    const py = curr.y + by * offset;
+    if (!isFinite(px) || !isFinite(py)) {
+      result.push({ x: curr.x, y: curr.y });
+      continue;
+    }
+    result.push({ x: px, y: py });
+  }
+  return result;
+}
+
+function offsetShapes(shapes, amount) {
+  const result = [];
+  for (const shape of shapes) {
+    const outerPts = shape.getPoints(12);
+    const trial = offsetContour(outerPts, amount);
+    if (trial.length < 3) continue;
+
+    const origArea = Math.abs(signedArea(outerPts));
+    const trialArea = Math.abs(signedArea(trial));
+    const expanded = trialArea > origArea ? trial : offsetContour(outerPts, -amount);
+    if (expanded.length < 3) continue;
+
+    const s = new THREE.Shape(expanded.map(p => new THREE.Vector2(p.x, p.y)));
+    for (const hole of shape.holes) {
+      const holePts = hole.getPoints(12);
+      const hTrial = offsetContour(holePts, amount);
+      const hOrigArea = Math.abs(signedArea(holePts));
+      const hTrialArea = Math.abs(signedArea(hTrial));
+      const shrunk = hTrialArea < hOrigArea ? hTrial : offsetContour(holePts, -amount);
+      if (shrunk.length >= 3) {
+        s.holes.push(new THREE.Path(shrunk.map(p => new THREE.Vector2(p.x, p.y))));
+      }
+    }
+    result.push(s);
+  }
+  return result;
+}
+
 function generateOutlinePendant(lines, material, materialOpts, opts) {
   const {
-    outlineBaseDepth, outlineRaisedDepth, outlineScale,
+    outlineBaseDepth, outlineRaisedDepth, outlineWidth,
     outlineBottomColor, outlineTopColor,
     lineSpacing, chainInfo, chainType
   } = opts;
@@ -553,13 +645,10 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     const renderOpts = getTextRenderOpts(line.fontKey, line.size);
     const displayText = renderOpts.preserveCase ? line.text : line.text.toUpperCase();
     const data = font.data;
-    const topScale = (line.size * 1.3) / data.resolution;
-    const baseScale = line.size / data.resolution;
-    const bottomScale = (line.size * outlineScale) / data.resolution;
+    const scale = line.size / data.resolution;
     const spacing = line.letterSpacing || 0;
 
     const charTopShapes = [];
-    const charBottomShapes = [];
     let cursor = 0;
 
     for (const char of displayText) {
@@ -570,26 +659,17 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
       const glyph = data.glyphs[char] || data.glyphs['?'];
       if (!glyph) continue;
 
-      const topShapes = buildCharShapes(glyph, topScale, cursor);
-      const bottomRaw = buildCharShapes(glyph, bottomScale, 0);
-
-      if (topShapes.length > 0 && bottomRaw.length > 0) {
-        const tb = shapeBounds(topShapes);
-        const bb = shapeBounds(bottomRaw);
-        const dx = tb.cx - bb.cx;
-        const dy = tb.cy - bb.cy;
-        const bottomShifted = shiftShapes(bottomRaw, dx, dy);
-        charTopShapes.push(...topShapes);
-        charBottomShapes.push(...bottomShifted);
-      } else if (topShapes.length > 0) {
+      const topShapes = buildCharShapes(glyph, scale, cursor);
+      if (topShapes.length > 0) {
         charTopShapes.push(...topShapes);
       }
 
-      cursor += (glyph.ha || 0) * baseScale + spacing;
+      cursor += (glyph.ha || 0) * scale + spacing;
     }
 
     if (charTopShapes.length === 0) continue;
 
+    const charBottomShapes = offsetShapes(charTopShapes, outlineWidth);
     const bb = shapeBounds(charBottomShapes.length > 0 ? charBottomShapes : charTopShapes);
     lineData.push({
       topShapes: charTopShapes,
@@ -727,7 +807,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     chainType = 'rope',
     outlineBaseDepth = 13,
     outlineRaisedDepth = 2,
-    outlineScale = 1.5,
+    outlineWidth = 1.5,
     outlineBottomColor = '#000000',
     outlineTopColor = null
   } = params;
@@ -850,7 +930,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     const fontsNeeded = [...new Set(lines.map(l => l.fontKey))];
     await Promise.all(fontsNeeded.map(fk => loadFont(fk)));
     return generateOutlinePendant(lines, material, materialOpts, {
-      outlineBaseDepth, outlineRaisedDepth, outlineScale,
+      outlineBaseDepth, outlineRaisedDepth, outlineWidth,
       outlineBottomColor, outlineTopColor,
       lineSpacing, chainInfo, chainType
     });
