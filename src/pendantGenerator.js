@@ -468,6 +468,7 @@ function generateShapesWithSpacing(font, text, size, spacing, preserveCase) {
 function generateOutlinePendant(lines, material, materialOpts, opts) {
   const {
     outlineBaseDepth, outlineRaisedDepth, outlineScale,
+    outlineBottomColor, outlineTopColor,
     lineSpacing, chainInfo, chainType
   } = opts;
 
@@ -570,20 +571,28 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
 
   if (bottomShapes.length === 0) return null;
 
+  const bottomMat = outlineBottomColor
+    ? new THREE.MeshStandardMaterial({ color: new THREE.Color(outlineBottomColor), metalness: 0.9, roughness: 0.35, envMapIntensity: 1.0 })
+    : material.clone();
+  if (!outlineBottomColor) bottomMat.roughness += 0.1;
   const bottomGeo = new THREE.ExtrudeGeometry(bottomShapes, {
     depth: outlineBaseDepth,
     bevelEnabled: false
   });
-  const bottomMesh = new THREE.Mesh(bottomGeo, material.clone());
-  bottomMesh.material.roughness += 0.1;
+  const bottomMesh = new THREE.Mesh(bottomGeo, bottomMat);
+  bottomMesh.userData.hasLineColor = true;
   group.add(bottomMesh);
 
   if (topShapes.length > 0 && outlineRaisedDepth > 0) {
+    const topMat = outlineTopColor
+      ? new THREE.MeshStandardMaterial({ color: new THREE.Color(outlineTopColor), metalness: 0.9, roughness: 0.25, envMapIntensity: 1.0 })
+      : material.clone();
     const topGeo = new THREE.ExtrudeGeometry(topShapes, {
       depth: outlineBaseDepth + outlineRaisedDepth,
       bevelEnabled: false
     });
-    const topMesh = new THREE.Mesh(topGeo, material.clone());
+    const topMesh = new THREE.Mesh(topGeo, topMat);
+    if (outlineTopColor) topMesh.userData.hasLineColor = true;
     group.add(topMesh);
   }
 
@@ -667,7 +676,9 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     chainType = 'rope',
     outlineBaseDepth = 13,
     outlineRaisedDepth = 2,
-    outlineScale = 1.2
+    outlineScale = 1.5,
+    outlineBottomColor = '#000000',
+    outlineTopColor = null
   } = params;
 
   // Custom STL replaces the entire plate+text pendant
@@ -789,6 +800,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     await Promise.all(fontsNeeded.map(fk => loadFont(fk)));
     return generateOutlinePendant(lines, material, materialOpts, {
       outlineBaseDepth, outlineRaisedDepth, outlineScale,
+      outlineBottomColor, outlineTopColor,
       lineSpacing, chainInfo, chainType
     });
   }
