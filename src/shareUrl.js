@@ -12,7 +12,7 @@ const SHARE_KEYS = [
   'lineSpacing', 'textAlignment',
   'platePadding', 'plateRadius', 'plateThickness', 'pendantShape',
   'engrave', 'borderWidth',
-  'outlineBaseDepth', 'outlineRaisedDepth', 'outlineScale',
+  'outlineBaseDepth', 'outlineRaisedDepth', 'outlineWidth',
   'outlineBottomColor', 'outlineTopColor',
   'pendantScale', 'pendantOffsetX', 'pendantOffsetY', 'pendantOffsetZ',
   'chainType', 'chainScale',

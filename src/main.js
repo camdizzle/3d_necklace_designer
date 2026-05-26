@@ -221,7 +221,7 @@ async function rebuildPendant(state) {
     chainType: state.chainType,
     outlineBaseDepth: state.outlineBaseDepth,
     outlineRaisedDepth: state.outlineRaisedDepth,
-    outlineScale: state.outlineScale,
+    outlineWidth: state.outlineWidth,
     outlineBottomColor: state.outlineBottomColor,
     outlineTopColor: state.outlineTopColor
   }, getMaterialOpts(state), scaledChainInfo);
