@@ -270,22 +270,6 @@ export function initUI(onChange) {
       onChange(state, 'outlineBottomColor');
     });
   }
-  const outlineTopToggle = document.getElementById('outline-top-color-toggle');
-  const outlineTopColorInput = document.getElementById('outline-top-color');
-  const outlineTopColorRow = document.getElementById('outline-top-color-row');
-  if (outlineTopToggle && outlineTopColorInput) {
-    outlineTopToggle.addEventListener('change', () => {
-      if (outlineTopColorRow) outlineTopColorRow.style.display = outlineTopToggle.checked ? '' : 'none';
-      state.outlineTopColor = outlineTopToggle.checked ? outlineTopColorInput.value : null;
-      onChange(state, 'outlineTopColor');
-    });
-    outlineTopColorInput.addEventListener('input', () => {
-      if (!outlineTopToggle.checked) return;
-      state.outlineTopColor = outlineTopColorInput.value;
-      onChange(state, 'outlineTopColor');
-    });
-  }
-
   // Border is premium: intercept on input/change so any non-zero value gates.
   const borderSlider = document.getElementById('border-width');
   const borderVal = document.getElementById('border-width-val');
@@ -549,12 +533,6 @@ export function initUI(onChange) {
     // Sync outline layer colors
     const obc = document.getElementById('outline-bottom-color');
     if (obc) obc.value = state.outlineBottomColor || '#000000';
-    const otToggle = document.getElementById('outline-top-color-toggle');
-    const otColor = document.getElementById('outline-top-color');
-    const otRow = document.getElementById('outline-top-color-row');
-    if (otToggle) otToggle.checked = !!state.outlineTopColor;
-    if (otColor && state.outlineTopColor) otColor.value = state.outlineTopColor;
-    if (otRow) otRow.style.display = state.outlineTopColor ? '' : 'none';
 
     // Sync per-line color toggles
     [['line1-color-toggle', 'line1-color', 'line1-color-row', 'lineColor1'],

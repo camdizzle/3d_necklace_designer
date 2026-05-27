@@ -166,7 +166,6 @@ export const DEFAULTS = {
   outlineRaisedDepth: 2,
   outlineWidth: 4.5,
   outlineBottomColor: '#000000',
-  outlineTopColor: null,
 
   // Pendant position
   pendantScale: 1.0,
