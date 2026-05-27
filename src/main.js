@@ -318,7 +318,7 @@ const state = initUI(async (newState, changedKey) => {
         newState.pendantOffsetX = 0;
         newState.pendantOffsetY = -3;
         newState.pendantOffsetZ = 2;
-      } else if (newState.chainType === 'cuban') {
+      } else {
         newState.pendantOffsetX = -2;
         newState.pendantOffsetY = 4;
         newState.pendantOffsetZ = 0;
