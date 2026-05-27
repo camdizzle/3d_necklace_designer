@@ -872,6 +872,9 @@ function updateShapeVisibility() {
   const isOutline = state.pendantShape === 'outline';
   if (cornerRadiusGroup) cornerRadiusGroup.style.display = state.pendantShape === 'rectangle' ? '' : 'none';
   if (outlineControlsEl) outlineControlsEl.style.display = isOutline ? '' : 'none';
+  document.querySelectorAll('.hide-in-outline').forEach(el => {
+    el.style.display = isOutline ? 'none' : '';
+  });
 }
 const shapeSelectEl = document.getElementById('shape-select');
 if (shapeSelectEl) {
