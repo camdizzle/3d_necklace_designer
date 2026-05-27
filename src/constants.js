@@ -138,7 +138,7 @@ export const DEFAULTS = {
   thirdLineAlignToPlate: false,
 
   // Shared text settings
-  lineSpacing: 1.0,
+  lineSpacing: 0.7,
   textAlignment: 'center',
   bevelThickness: 1.5,
   bevelSize: 1,
@@ -170,7 +170,7 @@ export const DEFAULTS = {
 
   // Pendant position
   pendantScale: 1.0,
-  pendantOffsetX: 0,
+  pendantOffsetX: -2,
   pendantOffsetY: 4,
   pendantOffsetZ: 0,
 
