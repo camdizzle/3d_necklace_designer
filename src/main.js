@@ -314,6 +314,16 @@ const state = initUI(async (newState, changedKey) => {
       chainMesh.scale.setScalar(newState.chainScale);
       chainMesh.visible = !newState.hideChain;
       scene.add(chainMesh);
+      if (newState.chainType === 'twisted-star') {
+        newState.pendantOffsetX = 0;
+        newState.pendantOffsetY = -3;
+        newState.pendantOffsetZ = 2;
+      } else if (newState.chainType === 'cuban') {
+        newState.pendantOffsetX = -2;
+        newState.pendantOffsetY = 4;
+        newState.pendantOffsetZ = 0;
+      }
+      window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: newState }));
       await rebuildPendant(newState);
     } catch (err) {
       console.error('Failed to load chain:', err);
