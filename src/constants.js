@@ -175,7 +175,7 @@ export const DEFAULTS = {
   pendantOffsetZ: 0,
 
   // Chain
-  chainType: 'rope',
+  chainType: 'cuban',
   chainScale: 1.0,
   hideChain: false,
 
