@@ -318,9 +318,9 @@ const state = initUI(async (newState, changedKey) => {
         newState.pendantOffsetY = -3;
         newState.pendantOffsetZ = 2;
       } else {
-        newState.pendantOffsetX = -2;
-        newState.pendantOffsetY = 4;
-        newState.pendantOffsetZ = 0;
+        newState.pendantOffsetX = 1;
+        newState.pendantOffsetY = -4;
+        newState.pendantOffsetZ = 2;
       }
       window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: newState }));
       await rebuildPendant(newState);
