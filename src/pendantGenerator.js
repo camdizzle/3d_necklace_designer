@@ -586,7 +586,7 @@ function offsetShapes(shapes, amount) {
 function generateOutlinePendant(lines, material, materialOpts, opts) {
   const {
     outlineBaseDepth, outlineRaisedDepth, outlineWidth,
-    outlineBottomColor, outlineTopColor,
+    outlineBottomColor,
     lineSpacing, chainInfo, chainType
   } = opts;
 
@@ -594,7 +594,6 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
   group.name = 'pendant';
 
   const allBottomShapes = [];
-  const allTopShapes = [];
   const lineData = [];
 
   for (const line of lines) {
@@ -634,7 +633,8 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
       topShapes: charTopShapes,
       bottomShapes: charBottomShapes,
       height: bb.maxY - bb.minY,
-      cx: bb.cx, cy: bb.cy
+      cx: bb.cx, cy: bb.cy,
+      color: line.color || null
     });
   }
 
@@ -654,7 +654,7 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
     const dx = -ld.cx;
     const dy = lineY - ld.cy;
     allBottomShapes.push(...shiftShapes(ld.bottomShapes, dx, dy));
-    allTopShapes.push(...shiftShapes(ld.topShapes, dx, dy));
+    ld.shiftedTopShapes = shiftShapes(ld.topShapes, dx, dy);
     cursorY -= ld.height;
   }
 
@@ -672,18 +672,21 @@ function generateOutlinePendant(lines, material, materialOpts, opts) {
   bottomMesh.userData.hasLineColor = true;
   group.add(bottomMesh);
 
-  if (allTopShapes.length > 0 && outlineRaisedDepth > 0) {
-    const topMat = outlineTopColor
-      ? new THREE.MeshStandardMaterial({ color: new THREE.Color(outlineTopColor), metalness: 0.9, roughness: 0.25, envMapIntensity: 1.0 })
-      : material.clone();
-    const topGeo = new THREE.ExtrudeGeometry(allTopShapes, {
-      depth: outlineRaisedDepth,
-      bevelEnabled: false
-    });
-    const topMesh = new THREE.Mesh(topGeo, topMat);
-    topMesh.position.z = outlineBaseDepth;
-    if (outlineTopColor) topMesh.userData.hasLineColor = true;
-    group.add(topMesh);
+  if (outlineRaisedDepth > 0) {
+    for (const ld of lineData) {
+      if (!ld.shiftedTopShapes || ld.shiftedTopShapes.length === 0) continue;
+      const topMat = ld.color
+        ? new THREE.MeshStandardMaterial({ color: new THREE.Color(ld.color), metalness: 0.9, roughness: 0.25, envMapIntensity: 1.0 })
+        : material.clone();
+      const topGeo = new THREE.ExtrudeGeometry(ld.shiftedTopShapes, {
+        depth: outlineRaisedDepth,
+        bevelEnabled: false
+      });
+      const topMesh = new THREE.Mesh(topGeo, topMat);
+      topMesh.position.z = outlineBaseDepth;
+      if (ld.color) topMesh.userData.hasLineColor = true;
+      group.add(topMesh);
+    }
   }
 
   const box = new THREE.Box3().setFromObject(group);
@@ -767,8 +770,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     outlineBaseDepth = 8,
     outlineRaisedDepth = 2,
     outlineWidth = 4.5,
-    outlineBottomColor = '#000000',
-    outlineTopColor = null
+    outlineBottomColor = '#000000'
   } = params;
 
   // Custom STL replaces the entire plate+text pendant
@@ -890,7 +892,7 @@ export async function generatePendant(params, materialOpts = {}, chainInfo = nul
     await Promise.all(fontsNeeded.map(fk => loadFont(fk)));
     return generateOutlinePendant(lines, material, materialOpts, {
       outlineBaseDepth, outlineRaisedDepth, outlineWidth,
-      outlineBottomColor, outlineTopColor,
+      outlineBottomColor,
       lineSpacing, chainInfo, chainType
     });
   }
