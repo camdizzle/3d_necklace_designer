@@ -403,7 +403,11 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
     return;
   }
   const text = state.text || 'necklace';
-  exportByFormat(pendantGroup, text, state.exportFormat || 'stl');
+  const exportGroup = new THREE.Group();
+  if (chainMesh && chainMesh.visible) exportGroup.add(chainMesh.clone());
+  exportGroup.add(pendantGroup.clone());
+  exportGroup.updateMatrixWorld(true);
+  exportByFormat(exportGroup, text, state.exportFormat || 'stl');
 });
 
 // Screenshot — free with watermark, Pro without.
