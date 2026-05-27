@@ -3,49 +3,38 @@
 ## Business Model
 - All features unlocked for every user (no pro/free tiers)
 - Design, share, screenshot: free
-- Export (STL/OBJ/GLB): $2 per download via Stripe Checkout
+- Export (STL): $2 per download via Stripe Checkout
 - Order physical print: $25/unit via Stripe Checkout (unchanged)
 
 ## Production Readiness (from codebase review 2026-05-27)
 
 ### P0 — Blockers (export money path is currently broken)
-- [ ] **Webhook destroys paid exports.** `checkout.session.completed` fires for
-      $2 export payments too; the handler calls `createOrder()` which RENAMES
-      `export_<id>.stl` → `ORD-xxx.stl`. The buyer's `/api/export-download/<id>`
-      then 404s — they pay and get nothing. Also creates junk $2 "orders" in the
-      fulfillment dashboard. Fix: webhook must skip sessions where
-      `metadata.type === 'export'`. (api/webhooks.js)
-- [ ] **No payment verification on export download.** `/api/export-download/:id`
-      serves the STL to anyone who knows the (random) id, with no Stripe check.
-      Verify `session.payment_status === 'paid'` (or mark paid via webhook)
-      before serving. (api/orders.js)
-- [ ] **OBJ/GLB exports silently broken.** The $2 flow always runs `STLExporter`
-      and serves `necklace.stl`, ignoring `state.exportFormat`. Customer can pick
-      OBJ/GLB, pay $2, and get an STL. Either export per-format or remove the
-      OBJ/GLB options from the UI. (src/main.js, api/orders.js)
+- [x] **Webhook destroys paid exports.** Fixed: webhook now checks
+      `session.metadata?.type === 'export'` and skips order creation, instead
+      writing a `.paid` marker file. (api/webhooks.js)
+- [x] **No payment verification on export download.** Fixed: download endpoint
+      returns 402 until the `.paid` marker exists; frontend retries with backoff.
+      (api/orders.js, src/main.js)
+- [x] **OBJ/GLB exports silently broken.** Fixed: removed OBJ/GLB options from
+      the format selector (STL-only). Removed dead `exportByFormat` import.
+      (index.html, src/main.js)
 
 ### P1 — Important (fix before / around launch)
-- [ ] **Temp STL files leak forever.** `export_*.stl` and `pending_*.stl` are
-      written before payment; abandoned checkouts are never cleaned. Add a sweep
-      that deletes temp files older than N hours. (api/orders.js)
-- [ ] **No slider debounce → rebuild storm.** Every slider tick triggers a full
-      synchronous geometry rebuild (TextGeometry + Clipper + Box3); relief/
-      threshold sliders re-run image processing each tick. Debounce/throttle
-      `rebuildPendant`. (src/ui.js, src/main.js)
-- [ ] **Relief heightmap memory growth.** `createHeightmapData` allocates a fresh
-      resolution² PlaneGeometry every rebuild; combined with no debounce it leaks
-      fast when a relief image is active. (src/pendantGenerator.js)
-- [ ] **Unvalidated share-URL state → NaN geometry.** Restored numeric params
-      (outlineWidth, plateThickness, offsets, lockedPlateW/H) aren't type/range
-      checked; a crafted hash can feed NaN/extreme values into geometry. Add
-      finite/clamp validation. (src/shareUrl.js)
-- [ ] **Unhandled rebuild/font-load failures.** `rebuildPendant` has no try/catch;
-      a font CDN hiccup throws an uncaught rejection and the pendant silently
-      fails to update with no user feedback. (src/main.js)
+- [x] **Temp STL files leak forever.** Fixed: periodic sweep (every 30 min)
+      deletes export_*/pending_* files older than 2 hours. (api/orders.js)
+- [x] **No slider debounce → rebuild storm.** Fixed: 80ms debounce on all
+      slider inputs in bindSlider. (src/ui.js)
+- [x] **Relief heightmap memory growth.** Fixed by debounce — old geometry is
+      already properly disposed each rebuild; rapid-fire was the issue.
+- [x] **Unvalidated share-URL state → NaN geometry.** Fixed: numeric params are
+      validated (isFinite + clamped to ±1000), booleans coerced. (src/shareUrl.js)
+- [x] **Unhandled rebuild/font-load failures.** Fixed: rebuildPendant body
+      wrapped in try/catch; errors logged to console. (src/main.js)
 
 ### P2 — Hardening / hygiene
-- [ ] **No security headers / HTTPS enforcement.** Add helmet (HSTS, CSP, etc.)
-      and redirect HTTP→HTTPS. (server.js)
+- [x] **No security headers / HTTPS enforcement.** Fixed: added X-Content-Type-
+      Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, and HSTS
+      (production only). (server.js)
 - [ ] **Remove stray large binaries from repo:** `LA+Kings+generic.3mf` (12MB)
       and `new_chain_loop.stl` (6MB) are unreferenced. Consider Git LFS for the
       committed chain STLs + fonts (~25MB).
@@ -54,13 +43,13 @@
       and order flows. Use a chunked/async approach. (src/main.js)
 - [ ] **No automated tests** for a payment app. At minimum cover pricing math and
       the export/order security boundaries.
-- [ ] **Pin Node version** via `engines` in package.json for the Plesk host.
-- [ ] **Dead code:** unused `exportByFormat` import in src/main.js.
+- [x] **Pin Node version** via `engines` in package.json (>=18.0.0).
+- [x] **Dead code:** removed unused `exportByFormat` import in src/main.js.
 - [ ] **In-memory rate limiter** resets on restart and won't span multiple
       workers — fine for single-instance Plesk, document the assumption.
 - [ ] **Empty README** (82 bytes) — add deploy/runbook + env-var docs.
-- [ ] **Cosmetic CSS injection** via color values in the order-modal `innerHTML`
-      (escaped, so not XSS). Validate hex format. (src/main.js)
+- [x] **Cosmetic CSS injection** via color values in the order-modal `innerHTML`.
+      Fixed: added `safeHexColor()` validator. (src/main.js)
 
 ## Domain Migration
 - [ ] Move from `designer.camwow.tv` to `hypechain.c23d.shop`

@@ -46,6 +46,18 @@ webhookRouter.post('/stripe', async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
+    // Export payments ($2) are not orders — just mark them as paid so
+    // the download endpoint can verify, then bail out.
+    if (session.metadata?.type === 'export') {
+      const exportId = session.metadata.exportId;
+      if (exportId) {
+        const { markExportPaid } = await import('./orders.js');
+        markExportPaid(exportId);
+        console.log(`Export ${exportId} marked as paid`);
+      }
+      return res.json({ received: true });
+    }
+
     try {
       const order = createOrder({
         stripeSessionId: session.id,

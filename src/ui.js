@@ -41,11 +41,13 @@ export function initUI(onChange) {
     const slider = document.getElementById(id);
     const valEl = document.getElementById(id + '-val');
     if (!slider) return;
+    let timer;
     slider.addEventListener('input', () => {
       const val = transform(slider.value);
       state[key] = val;
       if (valEl) valEl.textContent = val;
-      onChange(state, key);
+      clearTimeout(timer);
+      timer = setTimeout(() => onChange(state, key), 80);
     });
   }
 

@@ -56,6 +56,25 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 
+// Sweep temp STL/paid files older than 2 hours every 30 minutes
+const TEMP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+setInterval(() => {
+  try {
+    const now = Date.now();
+    for (const file of fs.readdirSync(ORDERS_DIR)) {
+      if (!/^(export_|pending_)/.test(file)) continue;
+      const full = path.join(ORDERS_DIR, file);
+      const age = now - fs.statSync(full).mtimeMs;
+      if (age > TEMP_MAX_AGE_MS) {
+        fs.unlinkSync(full);
+        console.log(`Cleaned up stale temp file: ${file}`);
+      }
+    }
+  } catch (err) {
+    console.error('Temp file sweep error:', err.message);
+  }
+}, 30 * 60 * 1000).unref();
+
 // -----------------------------------------------------------------
 // Order ID validation (alphanumeric and dashes only)
 // -----------------------------------------------------------------
@@ -310,20 +329,32 @@ ordersRouter.post('/export-checkout', async (req, res) => {
   }
 });
 
+// Mark an export as paid (called by webhook).
+export function markExportPaid(exportId) {
+  const marker = path.join(ORDERS_DIR, `export_${exportId}.paid`);
+  fs.writeFileSync(marker, new Date().toISOString());
+}
+
 // GET /api/export-download/:id — download the paid export STL.
 ordersRouter.get('/export-download/:id', (req, res) => {
   const exportId = req.params.id;
   if (!exportId || !/^[a-f0-9]+$/.test(exportId)) {
     return res.status(400).json({ error: 'Invalid export ID' });
   }
+
+  const paidMarker = path.join(ORDERS_DIR, `export_${exportId}.paid`);
+  if (!fs.existsSync(paidMarker)) {
+    return res.status(402).json({ error: 'Payment not yet confirmed. Please wait a moment and try again.' });
+  }
+
   const filePath = path.join(ORDERS_DIR, `export_${exportId}.stl`);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'Export not found or expired' });
   }
   res.download(filePath, 'necklace.stl', (err) => {
     if (!err) {
-      // Clean up after successful download
       try { fs.unlinkSync(filePath); } catch {}
+      try { fs.unlinkSync(paidMarker); } catch {}
     }
   });
 });

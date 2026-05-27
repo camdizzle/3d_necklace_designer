@@ -45,7 +45,18 @@ export function loadStateFromUrl() {
     const diff = JSON.parse(json);
     const restored = { ...DEFAULTS };
     for (const key of SHARE_KEYS) {
-      if (key in diff) restored[key] = diff[key];
+      if (!(key in diff)) continue;
+      let val = diff[key];
+      const def = DEFAULTS[key];
+      if (typeof def === 'number') {
+        val = Number(val);
+        if (!Number.isFinite(val)) continue;
+        val = Math.max(-1000, Math.min(1000, val));
+      }
+      if (typeof def === 'boolean') {
+        val = !!val;
+      }
+      restored[key] = val;
     }
     return restored;
   } catch (e) {

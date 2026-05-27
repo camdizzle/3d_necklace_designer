@@ -4,7 +4,7 @@ import { createScene } from './scene.js';
 import { loadChain, updateChainMaterial } from './chainLoader.js';
 import { generatePendant, updateMaterialOnGroup, createMaterial } from './pendantGenerator.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { exportByFormat, takeScreenshot, computeDimensions } from './exporter.js';
+import { takeScreenshot, computeDimensions } from './exporter.js';
 import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
 import { traceImageSilhouette, createHeightmapData } from './imageProcessor.js';
@@ -160,6 +160,7 @@ async function rebuildPendant(state) {
     pendantGroup = null;
   }
 
+  try {
   const scale = state.chainScale;
   const scaledChainInfo = chainInfo ? {
     innerTopY: chainInfo.innerTopY * scale,
@@ -245,6 +246,9 @@ async function rebuildPendant(state) {
 
   scene.add(pendantGroup);
   updateDimensions();
+  } catch (err) {
+    console.error('Pendant rebuild failed:', err);
+  }
 }
 
 function applyChainMaterial(state) {
@@ -508,6 +512,10 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function safeHexColor(c) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888';
+}
+
 function buildDesignDetails(st) {
   const lineEntries = [
     { text: st.text, font: st.font, color: st.lineColor1 },
@@ -554,7 +562,7 @@ if (orderBtn) {
     if (colorLabels.length > 0) {
       detailsHtml += `<strong>Text colors:</strong> `;
       detailsHtml += colorLabels.map(e =>
-        `"${esc(e.text)}" <span style="display:inline-block;width:12px;height:12px;background:${esc(e.color)};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${esc(e.color)}`
+        `"${esc(e.text)}" <span style="display:inline-block;width:12px;height:12px;background:${safeHexColor(e.color)};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${esc(e.color)}`
       ).join(', ') + `<br>`;
     }
 
@@ -675,10 +683,26 @@ if (orderModal) {
     window.history.replaceState({}, '', url.toString());
 
     if (eid) {
-      const link = document.createElement('a');
-      link.href = `/api/export-download/${eid}`;
-      link.download = 'necklace.stl';
-      link.click();
+      // Webhook may not have fired yet — retry a few times with backoff
+      async function attemptDownload(retries, delay) {
+        const res = await fetch(`/api/export-download/${eid}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'necklace.stl';
+          link.click();
+          URL.revokeObjectURL(url);
+          return;
+        }
+        if (res.status === 402 && retries > 0) {
+          await new Promise(r => setTimeout(r, delay));
+          return attemptDownload(retries - 1, delay * 2);
+        }
+        console.error('Export download failed:', res.status);
+      }
+      attemptDownload(5, 1500);
     }
 
     const toast = document.createElement('div');
