@@ -1,5 +1,11 @@
 # Chain Studio — 3D Necklace Designer
 
+## Business Model
+- All features unlocked for every user (no pro/free tiers)
+- Design, share, screenshot: free
+- Export (STL/OBJ/GLB): $2 per download via Stripe Checkout
+- Order physical print: $25/unit via Stripe Checkout (unchanged)
+
 ## Production Backlog
 
 ### Domain Migration

@@ -241,5 +241,89 @@ ordersRouter.post('/checkout', async (req, res) => {
   }
 });
 
-// Public STL download removed — use authenticated admin route at
-// /admin/api/orders/:id/stl instead.
+// -----------------------------------------------------------------
+// POST /api/export-checkout — $2 per-export Stripe Checkout.
+// Stores the STL temporarily, creates a Stripe session, and after
+// payment the success page triggers the download.
+// -----------------------------------------------------------------
+const EXPORT_PRICE_CENTS = 200; // $2
+
+ordersRouter.post('/export-checkout', async (req, res) => {
+  const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (rateLimit(clientIp, 5, 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+
+  if (!stripeKey) {
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
+  const { stlBase64, designName, format } = req.body;
+
+  if (!stlBase64) {
+    return res.status(400).json({ error: 'Missing STL data' });
+  }
+
+  const exportId = crypto.randomBytes(8).toString('hex');
+  const tempName = `export_${exportId}.stl`;
+  const tempPath = path.join(ORDERS_DIR, tempName);
+  fs.writeFileSync(tempPath, Buffer.from(stlBase64, 'base64'));
+
+  try {
+    const stripe = new Stripe(stripeKey);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `3D Model Export: ${designName || 'My Design'}`,
+              description: `Export in ${(format || 'stl').toUpperCase()} format`
+            },
+            unit_amount: EXPORT_PRICE_CENTS
+          },
+          quantity: 1
+        }
+      ],
+      metadata: {
+        type: 'export',
+        exportId,
+        designName: designName || 'necklace',
+        format: format || 'stl',
+        stlFile: tempName
+      },
+      success_url: `${baseUrl}/?export=success&eid=${exportId}&fmt=${format || 'stl'}&name=${encodeURIComponent(designName || 'necklace')}`,
+      cancel_url: `${baseUrl}/?export=cancelled`
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Export checkout creation failed:', err.message);
+    try { fs.unlinkSync(tempPath); } catch {}
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+// GET /api/export-download/:id — download the paid export STL.
+ordersRouter.get('/export-download/:id', (req, res) => {
+  const exportId = req.params.id;
+  if (!exportId || !/^[a-f0-9]+$/.test(exportId)) {
+    return res.status(400).json({ error: 'Invalid export ID' });
+  }
+  const filePath = path.join(ORDERS_DIR, `export_${exportId}.stl`);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Export not found or expired' });
+  }
+  res.download(filePath, 'necklace.stl', (err) => {
+    if (!err) {
+      // Clean up after successful download
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+  });
+});
