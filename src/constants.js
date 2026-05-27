@@ -170,7 +170,7 @@ export const DEFAULTS = {
 
   // Pendant position
   pendantScale: 1.0,
-  pendantOffsetX: 0,
+  pendantOffsetX: -2,
   pendantOffsetY: 4,
   pendantOffsetZ: 0,
 
