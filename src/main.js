@@ -4,11 +4,11 @@ import { createScene } from './scene.js';
 import { loadChain, updateChainMaterial } from './chainLoader.js';
 import { generatePendant, updateMaterialOnGroup, createMaterial } from './pendantGenerator.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { exportByFormat, takeScreenshot, computeDimensions } from './exporter.js';
+import { takeScreenshot, computeDimensions } from './exporter.js';
 import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
 import { traceImageSilhouette, createHeightmapData } from './imageProcessor.js';
-import { initPremium, isPro, showUpgradeModal, FEATURES } from './premium.js';
+import { initPremium, showExportModal } from './premium.js';
 import { createUndoRedo } from './undoRedo.js';
 import { csAlert, csConfirm, csPrompt } from './modal.js';
 import { stateToShareUrl, loadStateFromUrl, clearShareHash } from './shareUrl.js';
@@ -160,6 +160,7 @@ async function rebuildPendant(state) {
     pendantGroup = null;
   }
 
+  try {
   const scale = state.chainScale;
   const scaledChainInfo = chainInfo ? {
     innerTopY: chainInfo.innerTopY * scale,
@@ -245,6 +246,9 @@ async function rebuildPendant(state) {
 
   scene.add(pendantGroup);
   updateDimensions();
+  } catch (err) {
+    console.error('Pendant rebuild failed:', err);
+  }
 }
 
 function applyChainMaterial(state) {
@@ -391,28 +395,66 @@ const state = initUI(async (newState, changedKey) => {
   await rebuildPendant(newState);
 });
 
-// Export (Pro-gated)
+// Convert an ArrayBuffer to base64 without blocking the main thread.
+// FileReader does the encoding off-thread, avoiding the multi-second
+// String.fromCharCode + btoa loop on large meshes.
+function arrayBufferToBase64(buffer) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(new Blob([buffer]));
+  });
+}
+
+// Export ($2 per download via Stripe)
 if (exportBtn) exportBtn.addEventListener('click', async () => {
-  if (!isPro()) {
-    showUpgradeModal(FEATURES.export);
-    return;
-  }
   if (!pendantGroup) {
     await csAlert('No pendant to export.');
     return;
   }
-  const text = state.text || 'necklace';
-  const exportGroup = new THREE.Group();
-  if (chainMesh && chainMesh.visible) exportGroup.add(chainMesh.clone());
-  exportGroup.add(pendantGroup.clone());
-  exportGroup.updateMatrixWorld(true);
-  exportByFormat(exportGroup, text, state.exportFormat || 'stl');
+  showExportModal(async () => {
+    try {
+      const exportGroup = new THREE.Group();
+      if (chainMesh && chainMesh.visible) exportGroup.add(chainMesh.clone());
+      exportGroup.add(pendantGroup.clone());
+      exportGroup.updateMatrixWorld(true);
+
+      const exporter = new STLExporter();
+      const stlBuffer = exporter.parse(exportGroup, { binary: true });
+      const stlBase64 = await arrayBufferToBase64(stlBuffer);
+
+      const text = state.text || 'necklace';
+      const format = state.exportFormat || 'stl';
+      const res = await fetch('/api/export-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stlBase64, designName: text, format })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Server error' }));
+        throw new Error(err.error || 'Checkout failed');
+      }
+
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err) {
+      console.error('Export checkout failed:', err);
+      await csAlert('Failed to start checkout: ' + err.message);
+      const buyBtn = document.getElementById('export-modal-buy');
+      if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = 'Pay & Download'; }
+    }
+  });
 });
 
-// Screenshot — free with watermark, Pro without.
+// Screenshot — always watermark-free
 if (screenshotBtn) {
   screenshotBtn.addEventListener('click', () => {
-    takeScreenshot(renderer, scene, camera, { watermark: !isPro() });
+    takeScreenshot(renderer, scene, camera, { watermark: false });
   });
 }
 
@@ -480,6 +522,10 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function safeHexColor(c) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888';
+}
+
 function buildDesignDetails(st) {
   const lineEntries = [
     { text: st.text, font: st.font, color: st.lineColor1 },
@@ -526,7 +572,7 @@ if (orderBtn) {
     if (colorLabels.length > 0) {
       detailsHtml += `<strong>Text colors:</strong> `;
       detailsHtml += colorLabels.map(e =>
-        `"${esc(e.text)}" <span style="display:inline-block;width:12px;height:12px;background:${esc(e.color)};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${esc(e.color)}`
+        `"${esc(e.text)}" <span style="display:inline-block;width:12px;height:12px;background:${safeHexColor(e.color)};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${esc(e.color)}`
       ).join(', ') + `<br>`;
     }
 
@@ -550,16 +596,13 @@ if (orderBtn) {
           orderModalGo.textContent = 'PROCEED TO CHECKOUT';
           return;
         }
-        pendantGroup.updateMatrixWorld(true);
+        const orderGroup = new THREE.Group();
+        if (chainMesh && chainMesh.visible) orderGroup.add(chainMesh.clone());
+        orderGroup.add(pendantGroup.clone());
+        orderGroup.updateMatrixWorld(true);
         const exporter = new STLExporter();
-        const stlBuffer = exporter.parse(pendantGroup, { binary: true });
-
-        const bytes = new Uint8Array(stlBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const stlBase64 = btoa(binary);
+        const stlBuffer = exporter.parse(orderGroup, { binary: true });
+        const stlBase64 = await arrayBufferToBase64(stlBuffer);
 
         const res = await fetch('/api/checkout', {
           method: 'POST',
@@ -630,6 +673,60 @@ if (orderModal) {
   }
 }
 
+// Handle export success/cancel URL params (redirect back from Stripe)
+{
+  const params = new URLSearchParams(window.location.search);
+  const exportStatus = params.get('export');
+  if (exportStatus === 'success') {
+    const eid = params.get('eid');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('export');
+    url.searchParams.delete('eid');
+    url.searchParams.delete('fmt');
+    url.searchParams.delete('name');
+    window.history.replaceState({}, '', url.toString());
+
+    if (eid) {
+      // Webhook may not have fired yet — retry a few times with backoff
+      async function attemptDownload(retries, delay) {
+        const res = await fetch(`/api/export-download/${eid}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'necklace.stl';
+          link.click();
+          URL.revokeObjectURL(url);
+          return;
+        }
+        if (res.status === 402 && retries > 0) {
+          await new Promise(r => setTimeout(r, delay));
+          return attemptDownload(retries - 1, delay * 2);
+        }
+        console.error('Export download failed:', res.status);
+      }
+      attemptDownload(5, 1500);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'order-toast success';
+    toast.textContent = 'Export purchased! Your download should start automatically.';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
+  } else if (exportStatus === 'cancelled') {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('export');
+    window.history.replaceState({}, '', url.toString());
+
+    const toast = document.createElement('div');
+    toast.className = 'order-toast cancelled';
+    toast.textContent = 'Export cancelled. Your design is still here.';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
+  }
+}
+
 // Reset with confirmation
 if (resetBtn) {
   resetBtn.addEventListener('click', async () => {
@@ -685,11 +782,6 @@ if (svgInput) {
     const file = e.target.files[0];
     if (!file) return;
     if (!checkFileSize(file)) { svgInput.value = ''; return; }
-    if (!isPro()) {
-      svgInput.value = '';
-      showUpgradeModal(FEATURES.customSvg);
-      return;
-    }
 
     const text = await file.text();
     try {
@@ -753,11 +845,6 @@ if (imageSilhouetteInput) {
     const file = e.target.files[0];
     if (!file) return;
     if (!checkFileSize(file)) { imageSilhouetteInput.value = ''; return; }
-    if (!isPro()) {
-      imageSilhouetteInput.value = '';
-      showUpgradeModal(FEATURES.imageSilhouette);
-      return;
-    }
     silhouetteImageFile = file;
     try {
       const threshold = state.imageThreshold || 128;
@@ -781,11 +868,6 @@ if (imageReliefInput) {
     const file = e.target.files[0];
     if (!file) return;
     if (!checkFileSize(file)) { imageReliefInput.value = ''; return; }
-    if (!isPro()) {
-      imageReliefInput.value = '';
-      showUpgradeModal(FEATURES.imageRelief);
-      return;
-    }
     reliefImageFile = file;
     try {
       const heightmap = await createHeightmapData(file, {
@@ -808,11 +890,6 @@ if (stlImportInput) {
     const file = e.target.files[0];
     if (!file) return;
     if (!checkFileSize(file)) { stlImportInput.value = ''; return; }
-    if (!isPro()) {
-      stlImportInput.value = '';
-      showUpgradeModal(FEATURES.stlImport);
-      return;
-    }
     try {
       const buffer = await file.arrayBuffer();
       const loader = new STLLoader();

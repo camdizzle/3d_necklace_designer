@@ -22,7 +22,7 @@ const ORDERS_DIR = path.join(__dirname, '..', 'orders');
 // -----------------------------------------------------------------
 const UNIT_PRICE_CENTS = 2500; // $25 per unit
 
-function computePrice(quantity) {
+export function computePrice(quantity) {
   // Buy 3 get 1 free: every 4th item is free
   const freeItems = Math.floor(quantity / 4);
   const paidItems = quantity - freeItems;
@@ -31,6 +31,11 @@ function computePrice(quantity) {
 
 // -----------------------------------------------------------------
 // Simple in-memory rate limiter
+//
+// ASSUMPTION: single-instance deployment (Plesk Node.js, one worker).
+// State lives in process memory, so it resets on restart and is NOT
+// shared across multiple workers/instances. If this ever runs behind
+// a load balancer or with clustering, swap in a shared store (Redis).
 // -----------------------------------------------------------------
 const rateLimitMap = new Map(); // key: ip -> { count, resetTime }
 
@@ -56,11 +61,35 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 
+// Sweep temp STL/paid files older than 2 hours every 30 minutes
+const TEMP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+setInterval(() => {
+  try {
+    const now = Date.now();
+    for (const file of fs.readdirSync(ORDERS_DIR)) {
+      if (!/^(export_|pending_)/.test(file)) continue;
+      const full = path.join(ORDERS_DIR, file);
+      const age = now - fs.statSync(full).mtimeMs;
+      if (age > TEMP_MAX_AGE_MS) {
+        fs.unlinkSync(full);
+        console.log(`Cleaned up stale temp file: ${file}`);
+      }
+    }
+  } catch (err) {
+    console.error('Temp file sweep error:', err.message);
+  }
+}, 30 * 60 * 1000).unref();
+
 // -----------------------------------------------------------------
 // Order ID validation (alphanumeric and dashes only)
 // -----------------------------------------------------------------
-function isValidOrderId(id) {
+export function isValidOrderId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9-]+$/.test(id);
+}
+
+// Export ID validation (lowercase hex only — matches crypto.randomBytes hex)
+export function isValidExportId(id) {
+  return typeof id === 'string' && /^[a-f0-9]+$/.test(id);
 }
 
 // Ensure orders directory exists
@@ -241,5 +270,101 @@ ordersRouter.post('/checkout', async (req, res) => {
   }
 });
 
-// Public STL download removed — use authenticated admin route at
-// /admin/api/orders/:id/stl instead.
+// -----------------------------------------------------------------
+// POST /api/export-checkout — $2 per-export Stripe Checkout.
+// Stores the STL temporarily, creates a Stripe session, and after
+// payment the success page triggers the download.
+// -----------------------------------------------------------------
+const EXPORT_PRICE_CENTS = 200; // $2
+
+ordersRouter.post('/export-checkout', async (req, res) => {
+  const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (rateLimit(clientIp, 5, 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+
+  if (!stripeKey) {
+    return res.status(500).json({ error: 'Stripe not configured' });
+  }
+
+  const { stlBase64, designName, format } = req.body;
+
+  if (!stlBase64) {
+    return res.status(400).json({ error: 'Missing STL data' });
+  }
+
+  const exportId = crypto.randomBytes(8).toString('hex');
+  const tempName = `export_${exportId}.stl`;
+  const tempPath = path.join(ORDERS_DIR, tempName);
+  fs.writeFileSync(tempPath, Buffer.from(stlBase64, 'base64'));
+
+  try {
+    const stripe = new Stripe(stripeKey);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `3D Model Export: ${designName || 'My Design'}`,
+              description: `Export in ${(format || 'stl').toUpperCase()} format`
+            },
+            unit_amount: EXPORT_PRICE_CENTS
+          },
+          quantity: 1
+        }
+      ],
+      metadata: {
+        type: 'export',
+        exportId,
+        designName: designName || 'necklace',
+        format: format || 'stl',
+        stlFile: tempName
+      },
+      success_url: `${baseUrl}/?export=success&eid=${exportId}&fmt=${format || 'stl'}&name=${encodeURIComponent(designName || 'necklace')}`,
+      cancel_url: `${baseUrl}/?export=cancelled`
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Export checkout creation failed:', err.message);
+    try { fs.unlinkSync(tempPath); } catch {}
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+// Mark an export as paid (called by webhook).
+export function markExportPaid(exportId) {
+  const marker = path.join(ORDERS_DIR, `export_${exportId}.paid`);
+  fs.writeFileSync(marker, new Date().toISOString());
+}
+
+// GET /api/export-download/:id — download the paid export STL.
+ordersRouter.get('/export-download/:id', (req, res) => {
+  const exportId = req.params.id;
+  if (!isValidExportId(exportId)) {
+    return res.status(400).json({ error: 'Invalid export ID' });
+  }
+
+  const paidMarker = path.join(ORDERS_DIR, `export_${exportId}.paid`);
+  if (!fs.existsSync(paidMarker)) {
+    return res.status(402).json({ error: 'Payment not yet confirmed. Please wait a moment and try again.' });
+  }
+
+  const filePath = path.join(ORDERS_DIR, `export_${exportId}.stl`);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Export not found or expired' });
+  }
+  res.download(filePath, 'necklace.stl', (err) => {
+    if (!err) {
+      try { fs.unlinkSync(filePath); } catch {}
+      try { fs.unlinkSync(paidMarker); } catch {}
+    }
+  });
+});
