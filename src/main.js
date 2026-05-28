@@ -572,8 +572,9 @@ function buildDesignDetails(st) {
     parts.push(line);
   });
   parts.push(`Shape: ${st.pendantShape}`);
-  parts.push(`Material: ${st.material}`);
-  if (st.twoTone) parts.push(`Chain material: ${st.chainMaterial}`);
+  if (st.useCustomColor && st.customColor) parts.push(`Pendant color: ${st.customColor}`);
+  if (st.pendantShape === 'outline' && st.outlineBottomColor) parts.push(`Outline base color: ${st.outlineBottomColor}`);
+  parts.push(`Chain: ${st.material}${st.twoTone ? ` + ${st.chainMaterial} (two-tone)` : ''}`);
   if (st.matteFinish) parts.push('Finish: matte');
   if (st.engrave) parts.push('Engraved text');
   return parts.join('\n');
@@ -636,6 +637,8 @@ if (orderBtn) {
         const stlBuffer = exporter.parse(orderGroup, { binary: true });
         const stlBase64 = await arrayBufferToBase64(stlBuffer);
 
+        const shareUrl = stateToShareUrl(state);
+
         const res = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -644,7 +647,8 @@ if (orderBtn) {
             designName,
             designDetails: details,
             quantity: qty,
-            comments
+            comments,
+            shareUrl
           })
         });
 

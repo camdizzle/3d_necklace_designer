@@ -135,6 +135,7 @@ export function createOrder(data) {
     designDetails: data.designDetails || '',
     quantity: data.quantity || 1,
     comments: data.comments || '',
+    shareUrl: data.shareUrl || '',
     trackingNumber: null,
     trackingCarrier: null,
     notes: ''
@@ -212,7 +213,7 @@ ordersRouter.post('/checkout', async (req, res) => {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { stlBase64, designName, designDetails, quantity, comments } = req.body;
+  const { stlBase64, designName, designDetails, quantity, comments, shareUrl } = req.body;
 
   if (!stlBase64) {
     return res.status(400).json({ error: 'Missing STL data' });
@@ -255,7 +256,8 @@ ordersRouter.post('/checkout', async (req, res) => {
         designDetails: designDetails || '',
         stlFile: tempName,
         quantity: String(qty),
-        comments: (comments || '').slice(0, 500)
+        comments: (comments || '').slice(0, 500),
+        shareUrl: (shareUrl || '').slice(0, 500)
       },
       success_url: `${baseUrl}/?order=success`,
       cancel_url: `${baseUrl}/?order=cancelled`
