@@ -293,7 +293,13 @@
       </select>
 
       <label>Design</label>
-      <div id="modal-design" style="font-size:13px;"></div>
+      <div id="modal-design" style="font-size:13px;white-space:pre-wrap;"></div>
+      <div id="modal-share-link" style="margin-top:6px;"></div>
+
+      <div id="modal-comments-block" style="display:none;">
+        <label>Customer Comments</label>
+        <div id="modal-comments" style="font-size:13px;background:var(--card);padding:8px;border-radius:4px;white-space:pre-wrap;"></div>
+      </div>
 
       <label>Customer</label>
       <div id="modal-customer" style="font-size:13px;"></div>
@@ -428,7 +434,20 @@
       document.getElementById('modal-title').textContent = `Order ${id}`;
       document.getElementById('modal-status').value = order.status;
       document.getElementById('modal-design').textContent =
-        `${order.designName}${order.designDetails ? ' — ' + order.designDetails : ''}`;
+        `${order.designName}${order.designDetails ? '\n' + order.designDetails : ''}`;
+      const shareLinkEl = document.getElementById('modal-share-link');
+      if (order.shareUrl) {
+        shareLinkEl.innerHTML = `<a href="${esc(order.shareUrl)}" target="_blank" style="color:var(--gold);font-size:12px;">Open design in editor &rarr;</a>`;
+      } else {
+        shareLinkEl.innerHTML = '';
+      }
+      const commentsBlock = document.getElementById('modal-comments-block');
+      if (order.comments) {
+        document.getElementById('modal-comments').textContent = order.comments;
+        commentsBlock.style.display = '';
+      } else {
+        commentsBlock.style.display = 'none';
+      }
       document.getElementById('modal-customer').textContent =
         `${order.customerName} <${order.customerEmail}>`;
 
