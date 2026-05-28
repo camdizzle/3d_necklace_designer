@@ -35,19 +35,20 @@
 - [x] **No security headers / HTTPS enforcement.** Fixed: added X-Content-Type-
       Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, and HSTS
       (production only). (server.js)
-- [ ] **Remove stray large binaries from repo:** `LA+Kings+generic.3mf` (12MB)
-      and `new_chain_loop.stl` (6MB) are unreferenced. Consider Git LFS for the
-      committed chain STLs + fonts (~25MB).
-- [ ] **Sync base64 STL conversion blocks the main thread** (byte-by-byte
-      `String.fromCharCode` + `btoa`) for seconds on large meshes, in both export
-      and order flows. Use a chunked/async approach. (src/main.js)
-- [ ] **No automated tests** for a payment app. At minimum cover pricing math and
-      the export/order security boundaries.
+- [x] **Remove stray large binaries from repo:** Removed unreferenced
+      `LA+Kings+generic.3mf` (12MB) and `new_chain_loop.stl` (6MB). Git LFS for
+      the still-referenced chain STLs + fonts (~25MB) remains optional/pending.
+- [x] **Sync base64 STL conversion blocks the main thread.** Fixed: replaced the
+      byte-by-byte `String.fromCharCode` + `btoa` loop with an async FileReader
+      helper (`arrayBufferToBase64`) used by both export and order flows. (src/main.js)
+- [x] **No automated tests.** Fixed: added `test/orders.test.js` (Node built-in
+      runner, `npm test`) covering pricing math and order/export ID validation.
 - [x] **Pin Node version** via `engines` in package.json (>=18.0.0).
 - [x] **Dead code:** removed unused `exportByFormat` import in src/main.js.
-- [ ] **In-memory rate limiter** resets on restart and won't span multiple
-      workers — fine for single-instance Plesk, document the assumption.
-- [ ] **Empty README** (82 bytes) — add deploy/runbook + env-var docs.
+      Also wired the previously-dead `isValidOrderId` into the admin STL route.
+- [x] **In-memory rate limiter** assumption documented (single-instance Plesk;
+      use Redis if clustered/multi-worker). (api/orders.js, README.md)
+- [x] **Empty README** — added deploy/runbook, env-var table, and API route docs.
 - [x] **Cosmetic CSS injection** via color values in the order-modal `innerHTML`.
       Fixed: added `safeHexColor()` validator. (src/main.js)
 

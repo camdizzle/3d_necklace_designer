@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { listOrders, getOrder, updateOrder } from './orders.js';
+import { listOrders, getOrder, updateOrder, isValidOrderId } from './orders.js';
 import { sendShippingNotification } from './email.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -106,7 +106,7 @@ adminRouter.put('/api/orders/:id', async (req, res) => {
 // Download STL for an order
 adminRouter.get('/api/orders/:id/stl', (req, res) => {
   // Validate order ID format to prevent path traversal
-  if (!/^[A-Za-z0-9-]+$/.test(req.params.id)) {
+  if (!isValidOrderId(req.params.id)) {
     return res.status(400).json({ error: 'Invalid order ID format' });
   }
   const ordersDir = path.join(__dirname, '..', 'orders');

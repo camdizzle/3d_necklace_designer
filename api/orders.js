@@ -22,7 +22,7 @@ const ORDERS_DIR = path.join(__dirname, '..', 'orders');
 // -----------------------------------------------------------------
 const UNIT_PRICE_CENTS = 2500; // $25 per unit
 
-function computePrice(quantity) {
+export function computePrice(quantity) {
   // Buy 3 get 1 free: every 4th item is free
   const freeItems = Math.floor(quantity / 4);
   const paidItems = quantity - freeItems;
@@ -31,6 +31,11 @@ function computePrice(quantity) {
 
 // -----------------------------------------------------------------
 // Simple in-memory rate limiter
+//
+// ASSUMPTION: single-instance deployment (Plesk Node.js, one worker).
+// State lives in process memory, so it resets on restart and is NOT
+// shared across multiple workers/instances. If this ever runs behind
+// a load balancer or with clustering, swap in a shared store (Redis).
 // -----------------------------------------------------------------
 const rateLimitMap = new Map(); // key: ip -> { count, resetTime }
 
@@ -78,8 +83,13 @@ setInterval(() => {
 // -----------------------------------------------------------------
 // Order ID validation (alphanumeric and dashes only)
 // -----------------------------------------------------------------
-function isValidOrderId(id) {
+export function isValidOrderId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9-]+$/.test(id);
+}
+
+// Export ID validation (lowercase hex only — matches crypto.randomBytes hex)
+export function isValidExportId(id) {
+  return typeof id === 'string' && /^[a-f0-9]+$/.test(id);
 }
 
 // Ensure orders directory exists
@@ -338,7 +348,7 @@ export function markExportPaid(exportId) {
 // GET /api/export-download/:id — download the paid export STL.
 ordersRouter.get('/export-download/:id', (req, res) => {
   const exportId = req.params.id;
-  if (!exportId || !/^[a-f0-9]+$/.test(exportId)) {
+  if (!isValidExportId(exportId)) {
     return res.status(400).json({ error: 'Invalid export ID' });
   }
 

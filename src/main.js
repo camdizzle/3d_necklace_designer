@@ -395,6 +395,21 @@ const state = initUI(async (newState, changedKey) => {
   await rebuildPendant(newState);
 });
 
+// Convert an ArrayBuffer to base64 without blocking the main thread.
+// FileReader does the encoding off-thread, avoiding the multi-second
+// String.fromCharCode + btoa loop on large meshes.
+function arrayBufferToBase64(buffer) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(new Blob([buffer]));
+  });
+}
+
 // Export ($2 per download via Stripe)
 if (exportBtn) exportBtn.addEventListener('click', async () => {
   if (!pendantGroup) {
@@ -410,12 +425,7 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
 
       const exporter = new STLExporter();
       const stlBuffer = exporter.parse(exportGroup, { binary: true });
-      const bytes = new Uint8Array(stlBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const stlBase64 = btoa(binary);
+      const stlBase64 = await arrayBufferToBase64(stlBuffer);
 
       const text = state.text || 'necklace';
       const format = state.exportFormat || 'stl';
@@ -592,13 +602,7 @@ if (orderBtn) {
         orderGroup.updateMatrixWorld(true);
         const exporter = new STLExporter();
         const stlBuffer = exporter.parse(orderGroup, { binary: true });
-
-        const bytes = new Uint8Array(stlBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const stlBase64 = btoa(binary);
+        const stlBase64 = await arrayBufferToBase64(stlBuffer);
 
         const res = await fetch('/api/checkout', {
           method: 'POST',
