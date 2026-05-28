@@ -1,4 +1,4 @@
-import { DEFAULTS, OUTLINE_FONTS, FONT_LABELS } from './constants.js';
+import { DEFAULTS } from './constants.js';
 
 export function initUI(onChange) {
   const state = { ...DEFAULTS };
@@ -122,6 +122,45 @@ export function initUI(onChange) {
   bindCheckbox('align-to-plate-toggle', 'alignToPlate');
   bindLineColor('line1-color-toggle', 'line1-color', 'line1-color-row', 'lineColor1');
 
+  // "Apply color to all texts" — syncs line 2/3 colors to match line 1
+  const applyColorAllRow = document.getElementById('apply-color-all-row');
+  const applyColorAll = document.getElementById('apply-color-all');
+  const line1ColorToggle = document.getElementById('line1-color-toggle');
+  const line1ColorInput = document.getElementById('line1-color');
+
+  function syncAllTextColors() {
+    if (!applyColorAll?.checked || !line1ColorToggle?.checked) return;
+    const color = line1ColorInput.value;
+    state.lineColor2 = color;
+    state.lineColor3 = color;
+    [['line2-color-toggle', 'line2-color', 'line2-color-row'],
+     ['line3-color-toggle', 'line3-color', 'line3-color-row']
+    ].forEach(([tid, cid, rid]) => {
+      const t = document.getElementById(tid);
+      const c = document.getElementById(cid);
+      const r = document.getElementById(rid);
+      if (t) t.checked = true;
+      if (c) c.value = color;
+      if (r) r.style.display = '';
+    });
+    onChange(state, 'lineColor2');
+  }
+
+  if (line1ColorToggle && applyColorAllRow) {
+    line1ColorToggle.addEventListener('change', () => {
+      applyColorAllRow.style.display = line1ColorToggle.checked ? '' : 'none';
+      if (!line1ColorToggle.checked && applyColorAll) applyColorAll.checked = false;
+    });
+  }
+  if (applyColorAll) {
+    applyColorAll.addEventListener('change', () => {
+      if (applyColorAll.checked) syncAllTextColors();
+    });
+  }
+  if (line1ColorInput) {
+    line1ColorInput.addEventListener('input', syncAllTextColors);
+  }
+
   // --- Line 2 ---
   bindTextInput('second-line-input', 'secondLineText');
   bindSelect('second-line-font', 'secondLineFont');
@@ -172,45 +211,7 @@ export function initUI(onChange) {
   bindSlider('border-width', 'borderWidth', parseFloat);
 
   // --- Shape ---
-  const shapeSelect = document.getElementById('shape-select');
   bindSelect('shape-select', 'pendantShape');
-  if (shapeSelect) {
-    shapeSelect.addEventListener('change', () => {
-      updateFontSelectsForShape(shapeSelect.value);
-    });
-  }
-
-  const fontSelectIds = ['font-select', 'second-line-font', 'third-line-font'];
-  const fontStateKeys = ['font', 'secondLineFont', 'thirdLineFont'];
-  const savedNormalOptions = {};
-
-  fontSelectIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) savedNormalOptions[id] = el.innerHTML;
-  });
-
-  function updateFontSelectsForShape(shape) {
-    const isOutline = shape === 'outline';
-    fontSelectIds.forEach((id, i) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (isOutline) {
-        el.innerHTML = OUTLINE_FONTS.map(key =>
-          `<option value="${key}">${FONT_LABELS[key] || key}</option>`
-        ).join('');
-        if (!OUTLINE_FONTS.includes(state[fontStateKeys[i]])) {
-          state[fontStateKeys[i]] = OUTLINE_FONTS[0];
-        }
-        el.value = state[fontStateKeys[i]];
-      } else {
-        el.innerHTML = savedNormalOptions[id];
-        if (OUTLINE_FONTS.includes(state[fontStateKeys[i]])) {
-          state[fontStateKeys[i]] = 'helvetiker_bold';
-        }
-        el.value = state[fontStateKeys[i]];
-      }
-    });
-  }
 
   // --- Pendant position ---
   bindSlider('pendant-scale', 'pendantScale', parseFloat);
@@ -242,17 +243,42 @@ export function initUI(onChange) {
     bindCheckbox('use-custom-color', 'useCustomColor');
   }
   bindCheckbox('matte-toggle', 'matteFinish');
-  bindCheckbox('two-tone-toggle', 'twoTone');
 
-  const chainColorGroup = document.getElementById('chain-color-group');
+  // --- Chain color ---
   const twoToneToggle = document.getElementById('two-tone-toggle');
-  if (twoToneToggle && chainColorGroup) {
-    const syncChainGroup = () => {
-      chainColorGroup.style.display = twoToneToggle.checked ? '' : 'none';
-    };
-    twoToneToggle.addEventListener('change', syncChainGroup);
-    syncChainGroup();
+  const chainColor2Group = document.getElementById('chain-color-2-group');
+  if (twoToneToggle) {
+    twoToneToggle.addEventListener('change', () => {
+      state.twoTone = twoToneToggle.checked;
+      if (chainColor2Group) chainColor2Group.style.display = twoToneToggle.checked ? '' : 'none';
+      onChange(state, 'twoTone');
+    });
+    if (chainColor2Group) chainColor2Group.style.display = twoToneToggle.checked ? '' : 'none';
   }
+
+  // Primary chain tone buttons
+  const chainMatBtns = document.querySelectorAll('.chain-color-btn');
+  chainMatBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      chainMatBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.chainMaterial = btn.dataset.color;
+      state.twoTone = true;
+      if (twoToneToggle) twoToneToggle.checked = true;
+      if (chainColor2Group) chainColor2Group.style.display = '';
+      onChange(state, 'chainMaterial');
+      onChange(state, 'twoTone');
+    });
+  });
+
+  // Second tone buttons (two-tone only)
+  const chainTone2Btns = document.querySelectorAll('.chain-tone2-btn');
+  chainTone2Btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      chainTone2Btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
 
   const bgColorInput = document.getElementById('bg-color');
   if (bgColorInput) {
@@ -262,19 +288,8 @@ export function initUI(onChange) {
     });
   }
 
-  // Chain material (two-tone)
-  const chainMatBtns = document.querySelectorAll('.chain-color-btn');
-  chainMatBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      chainMatBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.chainMaterial = btn.dataset.color;
-      onChange(state, 'chainMaterial');
-    });
-  });
-
   // Pendant material presets
-  const colorBtns = document.querySelectorAll('.color-btn:not(.chain-color-btn)');
+  const colorBtns = document.querySelectorAll('.color-btn:not(.chain-color-btn):not(.chain-tone2-btn)');
   colorBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       colorBtns.forEach(b => b.classList.remove('active'));
@@ -387,8 +402,6 @@ export function initUI(onChange) {
     colorBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.material));
     chainMatBtns.forEach(b => b.classList.toggle('active', b.dataset.color === state.chainMaterial));
 
-    updateFontSelectsForShape(state.pendantShape);
-
     const obc = document.getElementById('outline-bottom-color');
     if (obc) obc.value = state.outlineBottomColor || '#000000';
 
@@ -404,8 +417,13 @@ export function initUI(onChange) {
       if (row) row.style.display = state[key] ? '' : 'none';
     });
 
-    const ccg = document.getElementById('chain-color-group');
-    if (ccg) ccg.style.display = state.twoTone ? '' : 'none';
+    if (applyColorAllRow && line1ColorToggle) {
+      applyColorAllRow.style.display = line1ColorToggle.checked ? '' : 'none';
+    }
+    if (applyColorAll) applyColorAll.checked = false;
+
+    if (chainColor2Group) chainColor2Group.style.display = state.twoTone ? '' : 'none';
+    if (twoToneToggle) twoToneToggle.checked = !!state.twoTone;
   }
 
   // Reset
@@ -435,7 +453,8 @@ export function initUI(onChange) {
   window.addEventListener('svg-shape-loaded', (e) => {
     state.customShapePoints = e.detail;
     state.pendantShape = 'custom';
-    shapeSelect.value = 'custom';
+    const ss = document.getElementById('shape-select');
+    if (ss) ss.value = 'custom';
     onChange(state, 'pendantShape');
   });
 

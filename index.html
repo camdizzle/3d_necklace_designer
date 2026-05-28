@@ -953,6 +953,100 @@
         <p>3D Necklace Designer</p>
       </div>
 
+      <!-- Pendant Shape -->
+      <div class="section">
+        <div class="section-title">Pendant Shape</div>
+        <div class="control-group">
+          <label for="shape-select">Shape</label>
+          <select id="shape-select">
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="oval">Oval</option>
+            <option value="diamond">Diamond</option>
+            <option value="shield">Shield</option>
+            <option value="heart">Heart</option>
+            <option value="star">Star</option>
+            <option value="outline">Outline</option>
+            <option value="custom">Custom (SVG)</option>
+          </select>
+        </div>
+        <div id="outline-controls" style="display:none">
+          <div class="control-group">
+            <label>Base Fill Depth</label>
+            <div class="slider-row">
+              <input type="range" id="outline-base-depth" min="1" max="20" value="8" step="0.5">
+              <span class="slider-value" id="outline-base-depth-val">8</span>
+            </div>
+          </div>
+          <div class="control-group">
+            <label>Outline Raised Depth</label>
+            <div class="slider-row">
+              <input type="range" id="outline-raised-depth" min="0.5" max="8" value="2" step="0.5">
+              <span class="slider-value" id="outline-raised-depth-val">2</span>
+            </div>
+          </div>
+          <div class="control-group">
+            <label>Outline Width</label>
+            <div class="slider-row">
+              <input type="range" id="outline-scale" min="0.2" max="5.0" value="4.5" step="0.1">
+              <span class="slider-value" id="outline-scale-val">4.5</span>
+            </div>
+          </div>
+          <div class="control-group">
+            <label>Bottom Layer Color</label>
+            <div class="color-row">
+              <input type="color" id="outline-bottom-color" value="#000000">
+              <span style="font-size:11px;color:var(--text-dim)">Back/bottom layer</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-subtitle hide-in-outline">Pendant Color</div>
+        <div class="control-group hide-in-outline">
+          <div class="color-presets">
+            <button class="color-btn gold active" data-color="gold">Gold</button>
+            <button class="color-btn silver" data-color="silver">Silver</button>
+            <button class="color-btn rose" data-color="rose">Rose Gold</button>
+            <button class="color-btn platinum" data-color="platinum">Platinum</button>
+          </div>
+        </div>
+        <div class="control-group hide-in-outline">
+          <div class="checkbox-row">
+            <input type="checkbox" id="use-custom-color">
+            <label for="use-custom-color">Custom Pendant Color</label>
+          </div>
+          <div class="color-row">
+            <input type="color" id="custom-color" value="#FFD700">
+            <span style="font-size:11px;color:var(--text-dim)">Pick any color</span>
+          </div>
+        </div>
+        <div class="control-group hide-in-outline">
+          <div class="checkbox-row">
+            <input type="checkbox" id="matte-toggle">
+            <label for="matte-toggle">Matte Finish</label>
+          </div>
+        </div>
+        <div class="control-group hide-in-outline">
+          <label>Import SVG Shape</label>
+          <div class="slider-row">
+            <div class="file-input-wrapper" style="flex:1">
+              <span class="file-input-label">Choose SVG file...</span>
+              <input type="file" id="svg-import" accept=".svg">
+            </div>
+            <button id="clear-svg" class="btn-clear" title="Clear SVG">✕</button>
+          </div>
+        </div>
+        <div class="control-group hide-in-outline">
+          <label>Import STL as Pendant</label>
+          <div class="slider-row">
+            <div class="file-input-wrapper" style="flex:1">
+              <span class="file-input-label">Choose STL file...</span>
+              <input type="file" id="stl-import" accept=".stl">
+            </div>
+            <button id="clear-stl" class="btn-clear" title="Clear STL">✕</button>
+          </div>
+        </div>
+      </div>
+
       <!-- LINE 1 -->
       <div class="section">
         <div class="section-title">Line 1</div>
@@ -981,6 +1075,14 @@
             <option value="tangerine">Tangerine ✦</option>
             <option value="alex_brush">Alex Brush ✦</option>
             <option value="kaushan_script">Kaushan Script ✦</option>
+            <option value="coiny">Coiny</option>
+            <option value="chewy">Chewy</option>
+            <option value="sour_gummy">Sour Gummy</option>
+            <option value="dynapuff">DynaPuff</option>
+            <option value="carter_one">Carter One</option>
+            <option value="bubblegum_sans">Bubblegum Sans</option>
+            <option value="archivo_black">Archivo Black</option>
+            <option value="alkatra">Alkatra</option>
           </select>
         </div>
         <div class="control-group">
@@ -991,6 +1093,10 @@
           <div class="color-row" id="line1-color-row" style="display:none">
             <input type="color" id="line1-color" value="#FFD700">
             <span style="font-size:11px;color:var(--text-dim)">Text color for Line 1</span>
+          </div>
+          <div class="checkbox-row" id="apply-color-all-row" style="display:none">
+            <input type="checkbox" id="apply-color-all">
+            <label for="apply-color-all">Apply color to all texts</label>
           </div>
         </div>
         <div class="control-group">
@@ -1077,6 +1183,14 @@
             <option value="tangerine">Tangerine ✦</option>
             <option value="alex_brush">Alex Brush ✦</option>
             <option value="kaushan_script">Kaushan Script ✦</option>
+            <option value="coiny">Coiny</option>
+            <option value="chewy">Chewy</option>
+            <option value="sour_gummy">Sour Gummy</option>
+            <option value="dynapuff">DynaPuff</option>
+            <option value="carter_one">Carter One</option>
+            <option value="bubblegum_sans">Bubblegum Sans</option>
+            <option value="archivo_black">Archivo Black</option>
+            <option value="alkatra">Alkatra</option>
           </select>
         </div>
         <div class="control-group">
@@ -1173,6 +1287,14 @@
             <option value="tangerine">Tangerine ✦</option>
             <option value="alex_brush">Alex Brush ✦</option>
             <option value="kaushan_script">Kaushan Script ✦</option>
+            <option value="coiny">Coiny</option>
+            <option value="chewy">Chewy</option>
+            <option value="sour_gummy">Sour Gummy</option>
+            <option value="dynapuff">DynaPuff</option>
+            <option value="carter_one">Carter One</option>
+            <option value="bubblegum_sans">Bubblegum Sans</option>
+            <option value="archivo_black">Archivo Black</option>
+            <option value="alkatra">Alkatra</option>
           </select>
         </div>
         <div class="control-group">
@@ -1267,75 +1389,6 @@
         </div>
       </div>
 
-      <!-- Pendant Shape -->
-      <div class="section">
-        <div class="section-title">Pendant Shape</div>
-        <div class="control-group">
-          <label for="shape-select">Shape</label>
-          <select id="shape-select">
-            <option value="rectangle">Rectangle</option>
-            <option value="circle">Circle</option>
-            <option value="oval">Oval</option>
-            <option value="diamond">Diamond</option>
-            <option value="shield">Shield</option>
-            <option value="heart">Heart</option>
-            <option value="star">Star</option>
-            <option value="outline">Outline</option>
-            <option value="custom">Custom (SVG)</option>
-          </select>
-        </div>
-        <div id="outline-controls" style="display:none">
-          <div class="control-group">
-            <label>Base Fill Depth</label>
-            <div class="slider-row">
-              <input type="range" id="outline-base-depth" min="1" max="20" value="8" step="0.5">
-              <span class="slider-value" id="outline-base-depth-val">8</span>
-            </div>
-          </div>
-          <div class="control-group">
-            <label>Outline Raised Depth</label>
-            <div class="slider-row">
-              <input type="range" id="outline-raised-depth" min="0.5" max="8" value="2" step="0.5">
-              <span class="slider-value" id="outline-raised-depth-val">2</span>
-            </div>
-          </div>
-          <div class="control-group">
-            <label>Outline Width</label>
-            <div class="slider-row">
-              <input type="range" id="outline-scale" min="0.2" max="5.0" value="4.5" step="0.1">
-              <span class="slider-value" id="outline-scale-val">4.5</span>
-            </div>
-          </div>
-          <div class="control-group">
-            <label>Bottom Layer Color</label>
-            <div class="color-row">
-              <input type="color" id="outline-bottom-color" value="#000000">
-              <span style="font-size:11px;color:var(--text-dim)">Back/bottom layer</span>
-            </div>
-          </div>
-        </div>
-        <div class="control-group hide-in-outline">
-          <label>Import SVG Shape</label>
-          <div class="slider-row">
-            <div class="file-input-wrapper" style="flex:1">
-              <span class="file-input-label">Choose SVG file...</span>
-              <input type="file" id="svg-import" accept=".svg">
-            </div>
-            <button id="clear-svg" class="btn-clear" title="Clear SVG">✕</button>
-          </div>
-        </div>
-        <div class="control-group hide-in-outline">
-          <label>Import STL as Pendant</label>
-          <div class="slider-row">
-            <div class="file-input-wrapper" style="flex:1">
-              <span class="file-input-label">Choose STL file...</span>
-              <input type="file" id="stl-import" accept=".stl">
-            </div>
-            <button id="clear-stl" class="btn-clear" title="Clear STL">✕</button>
-          </div>
-        </div>
-      </div>
-
       <!-- Image Import -->
       <div class="section hide-in-outline" id="image-import-section">
         <div class="section-title">Image Import</div>
@@ -1388,9 +1441,9 @@
         </div>
       </div>
 
-      <!-- Pendant (merged Backing Plate + Pendant Adjust) -->
+      <!-- Pendant Positioning -->
       <div class="section">
-        <div class="section-title">Pendant</div>
+        <div class="section-title">Pendant Positioning</div>
 
         <div class="section-subtitle hide-in-outline">Size</div>
         <div class="control-group hide-in-outline">
@@ -1496,47 +1549,31 @@
         </div>
       </div>
 
-      <!-- Material & Color (consolidated) -->
+      <!-- Chain Color -->
       <div class="section">
-        <div class="section-title">Material & Color</div>
+        <div class="section-title">Chain Color</div>
         <div class="control-group">
-          <label style="margin-bottom:6px">Pendant Color</label>
-          <div class="color-presets">
-            <button class="color-btn gold active" data-color="gold">Gold</button>
-            <button class="color-btn silver" data-color="silver">Silver</button>
-            <button class="color-btn rose" data-color="rose">Rose Gold</button>
-            <button class="color-btn platinum" data-color="platinum">Platinum</button>
-          </div>
-        </div>
-        <div class="control-group">
-          <div class="checkbox-row">
-            <input type="checkbox" id="use-custom-color">
-            <label for="use-custom-color">Custom Pendant Color</label>
-          </div>
-          <div class="color-row">
-            <input type="color" id="custom-color" value="#FFD700">
-            <span style="font-size:11px;color:var(--text-dim)">Pick any color</span>
-          </div>
-        </div>
-        <div class="control-group">
-          <div class="checkbox-row">
-            <input type="checkbox" id="matte-toggle">
-            <label for="matte-toggle">Matte Finish</label>
-          </div>
-        </div>
-        <div class="control-group">
-          <div class="checkbox-row">
-            <input type="checkbox" id="two-tone-toggle">
-            <label for="two-tone-toggle">Different Chain Color</label>
-          </div>
-        </div>
-        <div class="control-group" id="chain-color-group" style="display:none">
-          <label style="margin-bottom:6px">Chain Color</label>
+          <label style="margin-bottom:6px">Chain Tone</label>
           <div class="color-presets">
             <button class="color-btn chain-color-btn gold active" data-color="gold">Gold</button>
             <button class="color-btn chain-color-btn silver" data-color="silver">Silver</button>
             <button class="color-btn chain-color-btn rose" data-color="rose">Rose Gold</button>
             <button class="color-btn chain-color-btn platinum" data-color="platinum">Platinum</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="two-tone-toggle">
+            <label for="two-tone-toggle">Two-Tone Chain</label>
+          </div>
+        </div>
+        <div class="control-group" id="chain-color-2-group" style="display:none">
+          <label style="margin-bottom:6px">Second Tone</label>
+          <div class="color-presets">
+            <button class="color-btn chain-tone2-btn gold" data-color="gold">Gold</button>
+            <button class="color-btn chain-tone2-btn silver active" data-color="silver">Silver</button>
+            <button class="color-btn chain-tone2-btn rose" data-color="rose">Rose Gold</button>
+            <button class="color-btn chain-tone2-btn platinum" data-color="platinum">Platinum</button>
           </div>
         </div>
       </div>
