@@ -395,6 +395,37 @@ const state = initUI(async (newState, changedKey) => {
   await rebuildPendant(newState);
 });
 
+// Persist the current design before a Stripe redirect so the user
+// returns to the exact model they designed (to tweak / buy again).
+// Captured before the redirect handlers below clear the URL params.
+const PENDING_DESIGN_KEY = 'necklace_pending_design';
+const RETURNED_FROM_STRIPE = (() => {
+  const p = new URLSearchParams(window.location.search);
+  return p.has('export') || p.has('order');
+})();
+
+function savePendingDesign() {
+  try {
+    const snap = { ...state };
+    delete snap.reliefData;        // Float32Array — not safely serializable
+    delete snap.customSTLGeometry; // BufferGeometry — not serializable
+    localStorage.setItem(PENDING_DESIGN_KEY, JSON.stringify(snap));
+  } catch {}
+}
+
+function loadPendingDesign() {
+  try {
+    const raw = localStorage.getItem(PENDING_DESIGN_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingDesign() {
+  try { localStorage.removeItem(PENDING_DESIGN_KEY); } catch {}
+}
+
 // Convert an ArrayBuffer to base64 without blocking the main thread.
 // FileReader does the encoding off-thread, avoiding the multi-second
 // String.fromCharCode + btoa loop on large meshes.
@@ -427,12 +458,12 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
       const stlBuffer = exporter.parse(exportGroup, { binary: true });
       const stlBase64 = await arrayBufferToBase64(stlBuffer);
 
-      const text = state.text || 'necklace';
+      const designName = [state.text, state.secondLineText, state.thirdLineText].filter(Boolean).join(' / ') || 'necklace';
       const format = state.exportFormat || 'stl';
       const res = await fetch('/api/export-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stlBase64, designName: text, format })
+        body: JSON.stringify({ stlBase64, designName, format })
       });
 
       if (!res.ok) {
@@ -441,6 +472,7 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
       }
 
       const { url } = await res.json();
+      savePendingDesign();
       window.location.href = url;
     } catch (err) {
       console.error('Export checkout failed:', err);
@@ -622,6 +654,7 @@ if (orderBtn) {
         }
 
         const { url } = await res.json();
+        savePendingDesign();
         window.location.href = url;
       } catch (err) {
         console.error('Order failed:', err);
@@ -1044,17 +1077,25 @@ if (orderBtn) {
 (async () => {
   await initPremium();
 
-  // Load shared design from URL before init — merge into state so init() uses it
+  // Restore state before init so init() builds the right model.
+  // A shared URL takes priority; otherwise, if we just returned from a
+  // Stripe redirect, restore the design the user was working on.
   const shared = loadStateFromUrl();
+  let restored = shared;
   if (shared) {
-    Object.assign(state, shared);
     clearShareHash();
+  } else if (RETURNED_FROM_STRIPE) {
+    restored = loadPendingDesign();
+  }
+  clearPendingDesign();
+  if (restored) {
+    Object.assign(state, restored);
   }
 
   await init();
 
-  // Sync UI controls to match loaded state (shared URL)
-  if (shared) {
+  // Sync UI controls to match the restored state
+  if (restored) {
     window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: state }));
   }
 
