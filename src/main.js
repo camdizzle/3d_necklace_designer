@@ -427,12 +427,12 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
       const stlBuffer = exporter.parse(exportGroup, { binary: true });
       const stlBase64 = await arrayBufferToBase64(stlBuffer);
 
-      const text = state.text || 'necklace';
+      const designName = [state.text, state.secondLineText, state.thirdLineText].filter(Boolean).join(' / ') || 'necklace';
       const format = state.exportFormat || 'stl';
       const res = await fetch('/api/export-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stlBase64, designName: text, format })
+        body: JSON.stringify({ stlBase64, designName, format })
       });
 
       if (!res.ok) {
