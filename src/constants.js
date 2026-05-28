@@ -114,9 +114,9 @@ export const DEFAULTS = {
   alignToPlate: false,
 
   // Line 2
-  secondLineText: '',
+  secondLineText: 'Hype',
   secondLineFont: 'coiny',
-  secondLineSize: 16,
+  secondLineSize: 24,
   secondLineCurve: 0,
   secondLineOffsetX: 0,
   secondLineOffsetY: 0,
@@ -126,9 +126,9 @@ export const DEFAULTS = {
   secondLineAlignToPlate: false,
 
   // Line 3
-  thirdLineText: '',
+  thirdLineText: 'Chain',
   thirdLineFont: 'coiny',
-  thirdLineSize: 14,
+  thirdLineSize: 24,
   thirdLineCurve: 0,
   thirdLineOffsetX: 0,
   thirdLineOffsetY: 0,

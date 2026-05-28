@@ -27,7 +27,7 @@ export function initUI(onChange) {
     section.appendChild(body);
 
     const sectionId = title.textContent.trim();
-    if (collapseState[sectionId]) section.classList.add('collapsed');
+    if (collapseState[sectionId] !== false) section.classList.add('collapsed');
 
     title.addEventListener('click', () => {
       section.classList.toggle('collapsed');
