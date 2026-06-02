@@ -1,0 +1,191 @@
+CHAIN STUDIO — Product Feature Context
+======================================
+Use this document to generate promotional copy for the Chain Studio web app.
+The site is a browser-based 3D necklace designer where users create custom
+hip-hop / streetwear pendant chains with personalized text, choose from
+multiple styles and finishes, preview in real-time 3D, and either export the
+model or order a 3D-printed physical chain shipped to their door.
+
+URL: https://hypechain.c23d.shop (moving from designer.camwow.tv)
+
+------------------------------------------------------------------------
+PRICING & ACCESS
+------------------------------------------------------------------------
+- 100% free to use — no account required, no sign-up, no paywall.
+- Every design feature is unlocked for every user.
+- Designing, customizing, sharing, and screenshots are all free.
+- Export a 3D-printable STL file: $2 per download (Stripe Checkout).
+- Order a physical 3D-printed chain: $25 per chain + free shipping
+  (buy 3 get 1 free).
+- Shipping countries: US, Canada, UK, Australia.
+
+------------------------------------------------------------------------
+TEXT & TYPOGRAPHY
+------------------------------------------------------------------------
+- Up to 3 lines of custom text on the pendant.
+- 26 fonts available, organized in three categories:
+    * Classic/bold: Helvetiker Bold, Helvetiker, Optimer Bold, Optimer,
+      Gentilis Bold, Gentilis, Droid Sans Bold, Droid Sans,
+      Droid Serif Bold, Droid Serif
+    * Script/cursive: Dancing Script, Pacifico, Great Vibes, Allura,
+      Sacramento, Tangerine, Alex Brush, Kaushan Script
+    * Bubble/display: Coiny, Chewy, Sour Gummy, DynaPuff, Carter One,
+      Bubblegum Sans, Archivo Black, Alkatra
+- Each line has independent controls for:
+    * Font selection (any of the 26 fonts)
+    * Text size (2–40)
+    * Letter spacing
+    * Curve (arch/wave the text)
+    * Extrude depth (how thick the 3D text is)
+    * Bevel toggle (rounded edges on letters)
+    * X/Y offset (position each line independently)
+    * Align to plate toggle
+    * Custom color per line (hex color picker)
+- "Apply color to all texts" option syncs Line 2 and Line 3 colors
+  to Line 1 for quick uniform styling.
+- Text alignment: left, center, right.
+- Adjustable line spacing between text rows.
+
+------------------------------------------------------------------------
+PENDANT SHAPES
+------------------------------------------------------------------------
+9 pendant shape options:
+  1. Rectangle — classic plate shape with adjustable corner radius
+  2. Circle
+  3. Oval
+  4. Diamond
+  5. Shield
+  6. Heart
+  7. Star
+  8. Outline — floating 3D text with no backing plate; letters stand
+     alone connected by an outline border. Has dedicated controls for
+     base depth, raised depth, outline width, and base color.
+  9. Custom (SVG) — upload any SVG file to use as the pendant shape.
+
+Shape-specific controls:
+- Plate padding, thickness, corner radius, border width (non-outline shapes)
+- Outline shapes: base depth, raised text depth, outline width, base color
+- Lock pendant size option with fixed diameter (mm) input
+- Engrave toggle (recessed text instead of raised)
+
+------------------------------------------------------------------------
+PENDANT COLORS & MATERIALS
+------------------------------------------------------------------------
+Pendant finish presets:
+  - Gold (default)
+  - Silver
+  - Rose Gold
+  - Platinum
+
+Additional options:
+  - Custom color picker (any hex color for the pendant body)
+  - Matte finish toggle (reduces metallic sheen)
+  - Per-line text colors independent of pendant color
+
+------------------------------------------------------------------------
+CHAIN STYLES
+------------------------------------------------------------------------
+6 chain styles:
+  1. Cuban Link (default)
+  2. Rope
+  3. Twisted Star
+  4. Box
+  5. Figaro
+  6. Snake
+
+Chain controls:
+  - Adjustable chain scale (0.3x–2.0x)
+  - Hide chain toggle (preview pendant only)
+
+------------------------------------------------------------------------
+CHAIN COLOR
+------------------------------------------------------------------------
+- Single-tone: Gold, Silver, Rose Gold, or Platinum
+- Two-tone option: splits the chain color vertically (top half / bottom half)
+  with independent tone selection for each half
+- Chain color is independent of pendant color
+
+------------------------------------------------------------------------
+IMAGE IMPORT (non-outline shapes)
+------------------------------------------------------------------------
+- Image Silhouette: upload a PNG/JPEG/GIF/WebP image and Chain Studio
+  traces its outline to create a custom pendant shape. Threshold slider
+  controls the cutoff.
+- Image Relief / Heightmap: upload an image and it gets converted into
+  a 3D relief (raised surface) on the pendant. Controls for relief height,
+  resolution (16–128), and invert toggle.
+
+------------------------------------------------------------------------
+PENDANT POSITIONING
+------------------------------------------------------------------------
+- Scale slider (0.3x–3.0x)
+- X, Y, Z offset sliders for fine-tuning pendant placement on the chain
+- Lock pendant size with a fixed diameter in millimeters
+
+------------------------------------------------------------------------
+DISPLAY / VIEWPORT
+------------------------------------------------------------------------
+- Real-time interactive 3D preview powered by Three.js
+- Mouse/touch controls: left-drag to rotate, scroll to zoom, right-drag to pan
+- Customizable background color
+- Show/hide real-time dimensions overlay (width x height x depth)
+- Auto-rotate toggle for hands-free viewing
+- Viewport hint for control instructions
+
+------------------------------------------------------------------------
+ACTIONS & SHARING
+------------------------------------------------------------------------
+- Screenshot: download a PNG of the current 3D viewport (watermark-free)
+- Share Design: generates a unique URL that encodes the full design state;
+  anyone with the link sees the exact same design — no account needed
+- Save Preset / Load Preset: save and restore designs locally
+- Undo / Redo with keyboard shortcuts (Ctrl+Z / Ctrl+Y)
+- Reset All: restore every setting to defaults
+
+------------------------------------------------------------------------
+EXPORT
+------------------------------------------------------------------------
+- Export format: STL (industry-standard for 3D printing)
+- $2 per export via secure Stripe Checkout
+- File includes both pendant and chain (if visible) as a single mesh
+- Ready for slicing and 3D printing at home or via a print service
+
+------------------------------------------------------------------------
+ORDER A PHYSICAL CHAIN
+------------------------------------------------------------------------
+- $25 per chain, free shipping
+- Buy 3 get 1 free (25% off every 4th chain)
+- Quantity selector in the order modal
+- Customer comments field for special instructions
+- Shipping address collected at Stripe Checkout
+- Order confirmation email sent to customer
+- Tracking number emailed when the chain ships
+- 3D printed in high-quality plastic with the selected finish tone
+
+------------------------------------------------------------------------
+TECHNICAL HIGHLIGHTS (for tech-savvy audiences)
+------------------------------------------------------------------------
+- Runs entirely in the browser — no downloads, no installs, no plugins
+- Three.js-powered real-time 3D rendering with PBR materials
+- Responsive design works on desktop and mobile
+- Shareable URLs encode full design state (fonts, colors, sizes, positions)
+- Designs persist across Stripe payment redirects (no lost work)
+- Secure payment via Stripe Checkout (PCI compliant)
+
+------------------------------------------------------------------------
+DEFAULT EXPERIENCE
+------------------------------------------------------------------------
+When a new user lands on the site, they immediately see a 3D necklace
+with the text "Test / Hype / Chain" on a Cuban Link chain in gold.
+All sidebar sections are collapsed for a clean first impression — the
+3D viewport dominates the screen. Users expand sections as they explore.
+No sign-up, no loading screen beyond the initial 3D model load.
+
+------------------------------------------------------------------------
+TARGET AUDIENCE
+------------------------------------------------------------------------
+- Hip-hop / streetwear enthusiasts wanting custom name chains
+- Gift shoppers looking for personalized jewelry
+- 3D printing hobbyists who want printable chain models
+- Small jewelry businesses or Etsy sellers creating custom designs
+- Anyone who wants to visualize a custom pendant necklace before buying

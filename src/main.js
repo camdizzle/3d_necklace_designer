@@ -55,6 +55,26 @@ let reliefImageFile = null;
 const fixedDiameterInput = document.getElementById('fixed-diameter');
 const clearFixedDiameterBtn = document.getElementById('clear-fixed-diameter');
 
+// Admin bypass — visit with ?bypass=<key> to export without paying.
+let adminBypass = sessionStorage.getItem('admin_bypass') === '1';
+{
+  const bp = new URLSearchParams(window.location.search).get('bypass');
+  if (bp) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('bypass');
+    window.history.replaceState({}, '', url.toString());
+    fetch(`/api/verify-bypass?key=${encodeURIComponent(bp)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.valid) {
+          sessionStorage.setItem('admin_bypass', '1');
+          adminBypass = true;
+        }
+      })
+      .catch(() => {});
+  }
+}
+
 function getMaterialOpts(state) {
   return {
     key: state.material,
@@ -441,10 +461,31 @@ function arrayBufferToBase64(buffer) {
   });
 }
 
-// Export ($2 per download via Stripe)
+// Export ($2 per download via Stripe — bypassed for admin)
+function doDirectDownload() {
+  const exportGroup = new THREE.Group();
+  if (chainMesh && chainMesh.visible) exportGroup.add(chainMesh.clone());
+  exportGroup.add(pendantGroup.clone());
+  exportGroup.updateMatrixWorld(true);
+  const stlBuffer = new STLExporter().parse(exportGroup, { binary: true });
+  const name = [state.text, state.secondLineText, state.thirdLineText]
+    .filter(Boolean).join('_').replace(/\s+/g, '_').toLowerCase() || 'necklace';
+  const blob = new Blob([stlBuffer], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${name}_necklace.stl`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 if (exportBtn) exportBtn.addEventListener('click', async () => {
   if (!pendantGroup) {
     await csAlert('No pendant to export.');
+    return;
+  }
+  if (adminBypass) {
+    doDirectDownload();
     return;
   }
   showExportModal(async () => {
