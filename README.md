@@ -51,6 +51,7 @@ them in the Plesk Node.js panel in production).
 | `STRIPE_PUBLISHABLE_KEY` | — | Client-side Stripe key (`pk_…`). |
 | `ADMIN_USERNAME` | — | Admin dashboard user (defaults to `admin`). |
 | `ADMIN_PASSWORD` | yes* | Admin dashboard password. *Dashboard returns 503 until set. |
+| `ADMIN_BYPASS_KEY` | — | Secret key for owner export bypass. Visit `?bypass=<key>` to skip $2 export. |
 | `EMAIL_API_KEY` | — | Resend API key (`re_…`). Emails are skipped if unset. |
 | `EMAIL_FROM` | — | Sender / admin-notification address. |
 | `BASE_URL` | yes | Public origin; Stripe success/cancel URLs derive from it. |

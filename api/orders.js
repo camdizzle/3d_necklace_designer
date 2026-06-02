@@ -100,6 +100,21 @@ if (!fs.existsSync(ORDERS_DIR)) {
 export const ordersRouter = express.Router();
 
 // -----------------------------------------------------------------
+// Admin bypass — lets the site owner export without paying.
+// Set ADMIN_BYPASS_KEY in env; visit the site with ?bypass=<key>.
+// -----------------------------------------------------------------
+ordersRouter.get('/verify-bypass', (req, res) => {
+  const expected = process.env.ADMIN_BYPASS_KEY;
+  if (!expected) return res.json({ valid: false });
+  const key = req.query.key;
+  if (typeof key === 'string' && key.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected))) {
+    return res.json({ valid: true });
+  }
+  res.json({ valid: false });
+});
+
+// -----------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------
 
