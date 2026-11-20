@@ -1690,6 +1690,15 @@
         <div class="spinner"></div>
         <p>Loading chain model...</p>
       </div>
+      <script>
+        // If the designer's script never starts, say so instead of
+        // spinning forever.
+        setTimeout(function () {
+          if (window.__chainStudio) return;
+          var p = document.querySelector('#loading p');
+          if (p) p.textContent = 'The designer did not load. Please refresh the page; if it keeps happening, try again later.';
+        }, 20000);
+      </script>
       <div id="dimensions-display"></div>
       <div id="viewport-hint"><span class="hint-mouse">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</span><span class="hint-touch">Drag to rotate &bull; Pinch to zoom &bull; Two fingers to move</span></div>
     </div>

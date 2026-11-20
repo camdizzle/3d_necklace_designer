@@ -272,9 +272,16 @@ export function runBackup() {
   try {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
     const day = new Date().toISOString().slice(0, 10);
-    writeFileAtomic(path.join(BACKUP_DIR, `orders-${day}.json`), JSON.stringify(buildBackup()));
-    const old = fs.readdirSync(BACKUP_DIR).filter((f) => /^orders-.*\.json$/.test(f)).sort();
-    for (const f of old.slice(0, Math.max(0, old.length - BACKUP_KEEP))) {
+    // Random suffix: if the web server is ever misconfigured to serve
+    // the project folder, a backup still can't be fetched by guessing.
+    const files = () => fs.readdirSync(BACKUP_DIR).filter((f) => /^orders-.*\.json$/.test(f)).sort();
+    for (const f of files().filter((f) => f.startsWith(`orders-${day}`))) {
+      fs.unlinkSync(path.join(BACKUP_DIR, f));
+    }
+    const name = `orders-${day}-${crypto.randomBytes(12).toString('hex')}.json`;
+    writeFileAtomic(path.join(BACKUP_DIR, name), JSON.stringify(buildBackup()));
+    const all = files();
+    for (const f of all.slice(0, Math.max(0, all.length - BACKUP_KEEP))) {
       fs.unlinkSync(path.join(BACKUP_DIR, f));
     }
   } catch (err) {

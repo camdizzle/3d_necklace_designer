@@ -161,9 +161,22 @@ function buildStatus() {
   const has = (rel) => fs.existsSync(path.join(DIST, rel));
   return { designerBuilt: has('design/index.html'), siteAssetsBuilt: has('site.css') };
 }
-app.get('/api/health', (_req, res) => {
+// projectFolderExposed: the web server in front of the app (e.g. Plesk's
+// nginx) is serving files from the project folder directly. Set the
+// hosting panel's document root to the dist/ folder to fix it.
+app.get('/api/health', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ ok: true, ...buildStatus() });
+  let projectFolderExposed = null;
+  const base = process.env.BASE_URL;
+  if (base) {
+    try {
+      const r = await fetch(`${base.replace(/\/$/, '')}/package.json`, { signal: AbortSignal.timeout(5000) });
+      projectFolderExposed = r.ok && /"name"\s*:/.test(await r.text());
+    } catch {
+      projectFolderExposed = null;
+    }
+  }
+  res.json({ ok: true, ...buildStatus(), projectFolderExposed });
 });
 
 // The designer only exists after a build. Say so instead of a bare 404.
