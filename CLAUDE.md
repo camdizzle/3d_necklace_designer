@@ -8,7 +8,7 @@
 
 ## Layout
 - `/` landing, `/gallery/`, search pages, legal pages: Express, `api/pages.js`
-- `/design/`: the designer (Vite, `design/index.html`, `src/`)
+- `/design/`: the designer (Vite root `src/`, page `src/design/index.html`)
 - Example designs: `data/gallery.js`; images via `scripts/render-gallery.js`
 - Marketing kit: `marketing/`
 
@@ -23,7 +23,7 @@
 Only Cuban Link (`chain_loop.stl`) and Twisted Star have real meshes, so only
 those two are offered in the designer. To add a style: put the mesh in
 `public/`, map it in `src/chainLoader.js`, add it to `CHAIN_TYPES` in
-`src/main.js` and to the select in `design/index.html`.
+`src/main.js` and to the select in `src/design/index.html`.
 
 ### Owner follow-ups
 - [ ] Review the drafted terms / privacy / refund pages (`api/pages.js`)
