@@ -280,6 +280,7 @@
 
     <h2 style="font-size:14px;color:var(--gold);letter-spacing:1px;margin:32px 0 8px;">LAST 30 DAYS</h2>
     <div id="funnel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;"></div>
+    <p id="sources" style="font-size:13px;margin-top:10px;"></p>
     <p class="refresh-hint" style="text-align:left;margin-top:8px;">Anonymous daily counts recorded by the site itself. Visits include search-engine crawlers.</p>
     <p style="margin-top:20px;"><a class="btn" href="/admin/api/backup" style="text-decoration:none;">Download order backup</a>
     <span class="refresh-hint" style="margin-left:8px;">A snapshot is also saved on the server every day and kept for 30 days.</span></p>
@@ -537,6 +538,14 @@
             <div style="font-size:22px;font-weight:700;">${total}</div>
             <div style="font-size:11px;color:var(--dim);">${label}</div></div>`;
         }).join('');
+        const sources = {};
+        days.forEach((d) => Object.keys(d).filter((k) => k.startsWith('src:')).forEach((k) => {
+          sources[k.slice(4)] = (sources[k.slice(4)] || 0) + d[k];
+        }));
+        const names = Object.keys(sources).sort((a, b) => sources[b] - sources[a]);
+        document.getElementById('sources').textContent = names.length
+          ? 'Visits by source (utm_source): ' + names.map((n) => `${n} ${sources[n]}`).join(' · ')
+          : 'Visits by source: none yet. Add ?utm_source=name to links you share.';
       } catch {}
     }
 

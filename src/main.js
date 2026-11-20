@@ -18,10 +18,11 @@ import {
 // First-party funnel counter (no cookies, no personal data).
 function track(name) {
   try {
+    const src = new URLSearchParams(window.location.search).get('utm_source') || undefined;
     fetch('/api/event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, src }),
       keepalive: true
     }).catch(() => {});
   } catch {}

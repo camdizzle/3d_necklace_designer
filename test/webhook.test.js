@@ -148,3 +148,13 @@ test('safeFileStem produces safe names', () => {
   assert.equal(orders.safeFileStem('../../etc'), 'etc');
   assert.equal(orders.safeFileStem(''), 'necklace');
 });
+
+test('visit counters record a clean utm_source and ignore junk', () => {
+  orders.recordEvent('landing_view', 'Instagram');
+  orders.recordEvent('landing_view', '<script>');
+  orders.recordEvent('order_paid', 'instagram');
+  const today = orders.getStats(1)[0];
+  assert.equal(today['src:instagram'], 1);
+  assert.ok(today.landing_view >= 2);
+  assert.ok(!Object.keys(today).some((k) => k.includes('<')));
+});

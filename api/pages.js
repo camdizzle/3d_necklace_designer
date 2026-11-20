@@ -147,7 +147,7 @@ const HOME_FAQ = [
 // Landing page
 // ---------------------------------------------------------------------
 pagesRouter.get('/', (req, res) => {
-  recordEvent('landing_view');
+  recordEvent('landing_view', req.query.utm_source);
   const base = baseUrl(req);
   const body = `
 <script>
@@ -356,6 +356,7 @@ const INTENT_PAGES = [
 
 for (const page of INTENT_PAGES) {
   pagesRouter.get(page.path, (req, res) => {
+    recordEvent('landing_view', req.query.utm_source);
     const picks = page.picks.map((slug) => GALLERY.find((g) => g.slug === slug)).filter(Boolean);
     const body = `
 <section class="section first">

@@ -545,13 +545,29 @@ function loadStats() {
   return statsCache;
 }
 
+// A visit's utm_source, if it looks like one of ours (short, simple).
+export function cleanSource(src) {
+  const s = String(src ?? '').toLowerCase();
+  return /^[a-z0-9_-]{1,20}$/.test(s) ? s : null;
+}
+
+const MAX_SOURCES_PER_DAY = 25;
 let statsDirty = false;
-export function recordEvent(name) {
+export function recordEvent(name, src) {
   if (!EVENT_NAMES.has(name)) return;
   const stats = loadStats();
   const day = new Date().toISOString().slice(0, 10);
   stats[day] = stats[day] || {};
   stats[day][name] = (stats[day][name] || 0) + 1;
+  // Visits also count per traffic source ("src:instagram": 12).
+  const source = (name === 'landing_view' || name === 'designer_view') ? cleanSource(src) : null;
+  if (source) {
+    const key = `src:${source}`;
+    const known = Object.keys(stats[day]).filter((k) => k.startsWith('src:')).length;
+    if (stats[day][key] || known < MAX_SOURCES_PER_DAY) {
+      stats[day][key] = (stats[day][key] || 0) + 1;
+    }
+  }
   statsDirty = true;
 }
 
@@ -581,7 +597,7 @@ export function getStats(days = 30) {
 
 ordersRouter.post('/event', (req, res) => {
   if (!rateLimit(`event:${clientIp(req)}`, 60, 60 * 1000)) {
-    recordEvent(req.body?.name);
+    recordEvent(req.body?.name, req.body?.src);
   }
   res.status(204).end();
 });
