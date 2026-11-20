@@ -84,13 +84,21 @@ them in the Plesk Node.js panel in production).
 
 1. Push the repo and run `npm install` then `npm run build` on the host
    (the build needs the dev dependencies).
-2. Set the **Application Startup File** to `server.js`.
+2. Set the **Application Startup File** to `server.js`, and the **Document
+   Root** to the app's `dist` folder (e.g. `/httpdocs/dist`). Never point the
+   document root at the project folder itself: Plesk's web server would then
+   send the unbuilt designer page and make every project file, including
+   `orders/`, downloadable.
 3. Set all required env vars in the Node.js panel (see table above). Set
    `NODE_ENV=production` to enable the HSTS header.
 4. In the Stripe dashboard, add a webhook endpoint at
    `${BASE_URL}/api/webhooks/stripe` subscribed to `checkout.session.completed`,
    and copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
 5. Restart the app.
+6. Open `${BASE_URL}/api/health`. `designerBuilt` and `siteAssetsBuilt` must
+   be `true` (if not, the build did not run; see step 1) and
+   `projectFolderExposed` must be `false` (if not, fix the document root; see
+   step 2).
 
 ### Operational notes
 
