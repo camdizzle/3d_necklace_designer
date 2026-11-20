@@ -6,7 +6,7 @@ hip-hop / streetwear pendant chains with personalized text, choose from
 multiple styles and finishes, preview in real-time 3D, and either export the
 model or order a 3D-printed physical chain shipped to their door.
 
-URL: https://hypechain.c23d.shop (moving from designer.camwow.tv)
+URL: https://hypechain.c23d.shop  (designer at /design/, gallery at /gallery/)
 
 ------------------------------------------------------------------------
 PRICING & ACCESS
@@ -85,13 +85,9 @@ Additional options:
 ------------------------------------------------------------------------
 CHAIN STYLES
 ------------------------------------------------------------------------
-6 chain styles:
+2 chain styles:
   1. Cuban Link (default)
-  2. Rope
-  3. Twisted Star
-  4. Box
-  5. Figaro
-  6. Snake
+  2. Twisted Star
 
 Chain controls:
   - Adjustable chain scale (0.3x–2.0x)
@@ -145,7 +141,9 @@ ACTIONS & SHARING
 ------------------------------------------------------------------------
 EXPORT
 ------------------------------------------------------------------------
-- Export format: STL (industry-standard for 3D printing)
+- Export formats: STL (single body, any slicer) or 3MF (chain, base and
+  each lettering colour as separate coloured parts for multi-colour printers)
+- A print check warns about lettering that is too small or parts too thin
 - $2 per export via secure Stripe Checkout
 - File includes both pendant and chain (if visible) as a single mesh
 - Ready for slicing and 3D printing at home or via a print service
@@ -175,8 +173,8 @@ TECHNICAL HIGHLIGHTS (for tech-savvy audiences)
 ------------------------------------------------------------------------
 DEFAULT EXPERIENCE
 ------------------------------------------------------------------------
-When a new user lands on the site, they immediately see a 3D necklace
-with the text "Test / Hype / Chain" on a Cuban Link chain in gold.
+When a new user opens the designer, they immediately see a 3D necklace
+with the text "Your / Hype / Chain" on a Cuban Link chain in gold.
 All sidebar sections are collapsed for a clean first impression — the
 3D viewport dominates the screen. Users expand sections as they explore.
 No sign-up, no loading screen beyond the initial 3D model load.

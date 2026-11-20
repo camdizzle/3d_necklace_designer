@@ -7,12 +7,13 @@ fulfillment, and a password-protected admin dashboard.
 ## Business model
 
 - **Design, share, screenshot** — free, all features unlocked.
-- **Export STL** — $2 per download via Stripe Checkout.
+- **Export STL or colour 3MF** — $2 per download via Stripe Checkout.
 - **Order a physical print** — $25/unit via Stripe Checkout (buy 3 get 1 free).
 
 ## Stack
 
-- **Frontend:** Vite + Three.js (vanilla JS). Source in `src/`, entry `index.html`.
+- **Designer:** Vite + Three.js (vanilla JS). Source in `src/`, entry `design/index.html`, served at `/design/`.
+- **Site pages:** landing, gallery, search pages, legal pages, `robots.txt` and `sitemap.xml` are rendered by Express (`api/pages.js`, styles in `public/site.css`, example designs in `data/gallery.js`).
 - **Backend:** Express (`server.js`) serving the built `dist/` plus the API.
 - **Storage:** file-based orders in `orders/` (JSON + STL). No database.
 - **Payments:** Stripe Checkout + webhooks.
@@ -23,7 +24,7 @@ fulfillment, and a password-protected admin dashboard.
 ```bash
 npm install
 cp .env.example .env   # fill in your values
-npm run dev            # Vite dev server (frontend only) on :5173
+npm run dev            # Vite dev server, designer only: http://localhost:5173/design/
 ```
 
 To run the full stack (API + built frontend) locally:
@@ -36,7 +37,8 @@ npm start              # Express on :3000 (or $PORT)
 ## Tests
 
 ```bash
-npm test               # Node built-in runner; covers pricing math + ID validation
+npm test               # Node built-in runner: pricing, ID validation, and the
+                       # upload → webhook → order / paid-download paths
 ```
 
 ## Environment variables
@@ -51,7 +53,10 @@ them in the Plesk Node.js panel in production).
 | `STRIPE_PUBLISHABLE_KEY` | — | Client-side Stripe key (`pk_…`). |
 | `ADMIN_USERNAME` | — | Admin dashboard user (defaults to `admin`). |
 | `ADMIN_PASSWORD` | yes* | Admin dashboard password. *Dashboard returns 503 until set. |
-| `ADMIN_BYPASS_KEY` | — | Secret key for owner export bypass. Visit `?bypass=<key>` to skip $2 export. |
+| `ADMIN_BYPASS_KEY` | — | Secret key for owner export bypass. Visit `/design/#bypass=<key>` to skip the $2 export. |
+| `CONTACT_EMAIL` | — | Address shown on the legal pages (defaults to `EMAIL_FROM`). |
+| `LEGACY_HOSTS` | — | Old hostnames that 301 to `BASE_URL` (default `designer.camwow.tv`). |
+| `ORDERS_DIR` | — | Where orders are stored (default `orders/`). |
 | `EMAIL_API_KEY` | — | Resend API key (`re_…`). Emails are skipped if unset. |
 | `EMAIL_FROM` | — | Sender / admin-notification address. |
 | `BASE_URL` | yes | Public origin; Stripe success/cancel URLs derive from it. |
@@ -61,16 +66,24 @@ them in the Plesk Node.js panel in production).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/`, `/gallery/…`, `/custom-name-chain/` … | Server-rendered site pages. |
+| `GET` | `/design/` | The designer (Vite build). |
+| `GET` | `/robots.txt`, `/sitemap.xml` | Search engine files. |
+| `POST` | `/api/upload-model?format=stl\|3mf` | Binary model upload (gzip accepted); returns `uploadId`. |
 | `POST` | `/api/checkout` | Create a Stripe session for a physical order. |
-| `POST` | `/api/export-checkout` | Create a $2 Stripe session for an STL export. |
+| `POST` | `/api/export-checkout` | Create a $2 Stripe session for an export. |
 | `GET` | `/api/export-download/:id` | Download a paid export (402 until paid). |
+| `POST` | `/api/verify-bypass` | Check the owner bypass key (rate limited). |
+| `POST` | `/api/event` | Anonymous funnel counter. |
 | `POST` | `/api/webhooks/stripe` | Stripe webhook (`checkout.session.completed`). |
 | `GET` | `/admin` | Password-protected order dashboard. |
 | `GET/PUT` | `/admin/api/orders[/:id]` | List / update orders, set tracking. |
+| `GET` | `/admin/api/stats`, `/admin/api/backup` | Funnel counts; JSON backup of all orders. |
 
 ## Deployment (Plesk Node.js)
 
-1. Push the repo and run `npm install --omit=dev` then `npm run build` on the host.
+1. Push the repo and run `npm install` then `npm run build` on the host
+   (the build needs the dev dependencies).
 2. Set the **Application Startup File** to `server.js`.
 3. Set all required env vars in the Node.js panel (see table above). Set
    `NODE_ENV=production` to enable the HSTS header.
@@ -81,10 +94,18 @@ them in the Plesk Node.js panel in production).
 
 ### Operational notes
 
-- **Single instance only.** The rate limiter and webhook-paid markers live in
-  process memory / the local `orders/` directory. Running multiple workers or
-  instances would split that state — use a shared store (Redis) first.
-- **Temp files** (`export_*`, `pending_*` in `orders/`) are swept automatically
-  every 30 minutes once older than 2 hours.
-- **Payment flow:** the webhook writes an `export_<id>.paid` marker; the download
-  endpoint returns 402 until it exists, and the frontend retries with backoff.
+- **Single instance only.** The rate limiter, funnel counters and paid markers
+  live in process memory / the local `orders/` directory.
+- **Orders** are JSON files written atomically. A snapshot of every order is
+  saved daily to `orders/backups/` (30 kept) and can be downloaded from the
+  admin dashboard. Keep a copy off the server.
+- **Payment flow:** checkout stores the design record as `pending_<ref>.json`
+  and Stripe metadata carries only `ref`. The webhook creates the order once per
+  session and answers 500 if saving fails, so Stripe retries. Exports get an
+  `export_<id>.paid` marker; the download endpoint returns 402 until it exists.
+- **Temp files** (`upload_*`, `export_*`, `pending_*`) are swept after 4 hours;
+  checkout sessions expire after 2.
+- **Gallery images** are rendered from `data/gallery.js` with
+  `node scripts/render-gallery.js` (needs Playwright) against a running server.
+- **Search:** after deploying, add the site in Google Search Console and submit
+  `/sitemap.xml`.
