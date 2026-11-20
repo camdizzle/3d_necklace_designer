@@ -147,6 +147,35 @@ app.use(express.static(DIST, {
   }
 }));
 
+// Fallback: serve public/ directly. The landing pages' stylesheet, images
+// and favicon live there, so they keep working even when dist/ is missing
+// or stale because `npm run build` did not run on the host.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    res.setHeader('Cache-Control', cacheControl('/' + path.basename(filePath)));
+  }
+}));
+
+// Build status, for checking a deploy: open /api/health in a browser.
+function buildStatus() {
+  const has = (rel) => fs.existsSync(path.join(DIST, rel));
+  return { designerBuilt: has('design/index.html'), siteAssetsBuilt: has('site.css') };
+}
+app.get('/api/health', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, ...buildStatus() });
+});
+
+// The designer only exists after a build. Say so instead of a bare 404.
+app.get(['/design', '/design/'], (_req, res) => {
+  res.status(503).type('html').send(
+    '<!doctype html><meta charset="utf-8"><title>Designer unavailable — Chain Studio</title>' +
+    '<body style="font-family:system-ui;background:#1a1a2e;color:#eee;text-align:center;padding:15vh 16px">' +
+    '<h1>The designer is being updated</h1><p>Please try again in a few minutes.</p>' +
+    '<p><a style="color:#FFD700" href="/">Back to Chain Studio</a></p>'
+  );
+});
+
 // Anything else is a real 404 (search engines must not see a 200 here).
 app.use((req, res) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/admin')) {
@@ -160,6 +189,10 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
+  const status = buildStatus();
+  if (!status.designerBuilt || !status.siteAssetsBuilt) {
+    console.warn('WARNING: dist/ is missing or out of date. Run `npm install` (with dev dependencies) and `npm run build`.');
+  }
   console.log(`Chain Studio server running on port ${PORT}`);
   console.log(`Admin dashboard: http://localhost:${PORT}/admin`);
 });

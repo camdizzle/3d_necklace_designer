@@ -91,6 +91,8 @@ them in the Plesk Node.js panel in production).
    `${BASE_URL}/api/webhooks/stripe` subscribed to `checkout.session.completed`,
    and copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
 5. Restart the app.
+6. Open `${BASE_URL}/api/health`. Both `designerBuilt` and `siteAssetsBuilt`
+   must be `true`; if not, the build did not run (see step 1).
 
 ### Operational notes
 
