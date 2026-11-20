@@ -15,7 +15,7 @@ import Stripe from 'stripe';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ORDERS_DIR = path.join(__dirname, '..', 'orders');
+export const ORDERS_DIR = process.env.ORDERS_DIR || path.join(__dirname, '..', 'orders');
 
 // -----------------------------------------------------------------
 // Pricing constants
@@ -61,13 +61,16 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 
-// Sweep temp STL/paid files older than 2 hours every 30 minutes
-const TEMP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+// Sweep temp model/paid/meta files. Checkout sessions expire after
+// SESSION_TTL_MS, so anything older than TEMP_MAX_AGE_MS can no longer
+// be paid for and is safe to delete.
+const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+const TEMP_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 setInterval(() => {
   try {
     const now = Date.now();
     for (const file of fs.readdirSync(ORDERS_DIR)) {
-      if (!/^(export_|pending_)/.test(file)) continue;
+      if (!/^(export_|pending_|upload_)/.test(file)) continue;
       const full = path.join(ORDERS_DIR, file);
       const age = now - fs.statSync(full).mtimeMs;
       if (age > TEMP_MAX_AGE_MS) {
@@ -87,9 +90,26 @@ export function isValidOrderId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9-]+$/.test(id);
 }
 
-// Export ID validation (lowercase hex only — matches crypto.randomBytes hex)
+// Export / upload ID validation (lowercase hex only — matches crypto.randomBytes hex)
 export function isValidExportId(id) {
   return typeof id === 'string' && /^[a-f0-9]+$/.test(id);
+}
+
+// Model formats we accept for upload and serve for download.
+export const MODEL_FORMATS = { stl: 'model/stl', '3mf': 'model/3mf' };
+export function normalizeFormat(f) {
+  return Object.prototype.hasOwnProperty.call(MODEL_FORMATS, f) ? f : 'stl';
+}
+
+// Turn a design name into a safe download filename stem.
+export function safeFileStem(name) {
+  const stem = String(name || '')
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()
+    .slice(0, 60);
+  return stem || 'necklace';
 }
 
 // Ensure orders directory exists
@@ -100,23 +120,20 @@ if (!fs.existsSync(ORDERS_DIR)) {
 export const ordersRouter = express.Router();
 
 // -----------------------------------------------------------------
-// Admin bypass — lets the site owner export without paying.
-// Set ADMIN_BYPASS_KEY in env; visit the site with ?bypass=<key>.
-// -----------------------------------------------------------------
-ordersRouter.get('/verify-bypass', (req, res) => {
-  const expected = process.env.ADMIN_BYPASS_KEY;
-  if (!expected) return res.json({ valid: false });
-  const key = req.query.key;
-  if (typeof key === 'string' && key.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected))) {
-    return res.json({ valid: true });
-  }
-  res.json({ valid: false });
-});
-
-// -----------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------
+
+// Write via a temp file + rename so a crash mid-write can never leave
+// a half-written order on disk.
+export function writeFileAtomic(file, contents) {
+  const tmp = `${file}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  fs.writeFileSync(tmp, contents);
+  fs.renameSync(tmp, file);
+}
+
+function clientIp(req) {
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
 
 function generateId() {
   const ts = Date.now().toString(36);
@@ -128,12 +145,42 @@ function orderPath(id) {
   return path.join(ORDERS_DIR, `${id}.json`);
 }
 
-function stlPath(id) {
-  return path.join(ORDERS_DIR, `${id}.stl`);
+function isOrderFile(f) {
+  return /^ORD-[A-Z0-9-]+\.json$/.test(f);
+}
+
+// A pending checkout: the full design record we keep on our side so
+// Stripe metadata only has to carry a short reference.
+function pendingMetaPath(ref) {
+  return path.join(ORDERS_DIR, `pending_${ref}.json`);
+}
+
+export function savePending(ref, data) {
+  writeFileAtomic(pendingMetaPath(ref), JSON.stringify(data));
+}
+
+export function loadPending(ref) {
+  if (!isValidExportId(ref)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(pendingMetaPath(ref), 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+export function deletePending(ref) {
+  if (!isValidExportId(ref)) return;
+  try { fs.unlinkSync(pendingMetaPath(ref)); } catch {}
+}
+
+export function findOrderBySession(sessionId) {
+  if (!sessionId) return null;
+  return listOrders().find((o) => o.stripeSessionId === sessionId) || null;
 }
 
 export function createOrder(data) {
   const id = generateId();
+  const format = normalizeFormat(data.modelFormat);
   const order = {
     id,
     status: 'new',              // new → printing → shipped → delivered
@@ -151,32 +198,35 @@ export function createOrder(data) {
     quantity: data.quantity || 1,
     comments: data.comments || '',
     shareUrl: data.shareUrl || '',
+    modelFormat: format,
     trackingNumber: null,
     trackingCarrier: null,
     notes: ''
   };
 
-  fs.writeFileSync(orderPath(id), JSON.stringify(order, null, 2));
-
-  // If an STL filename was passed (from pre-upload), rename/link it.
+  // Move the uploaded model into place first: if that fails we throw
+  // before the order exists, and the webhook asks Stripe to retry.
   if (data.stlFile) {
-    const src = path.join(ORDERS_DIR, data.stlFile);
-    if (fs.existsSync(src) && src !== stlPath(id)) {
-      fs.renameSync(src, stlPath(id));
+    const src = path.join(ORDERS_DIR, path.basename(data.stlFile));
+    const dest = path.join(ORDERS_DIR, `${id}.${format}`);
+    if (fs.existsSync(src) && src !== dest) {
+      fs.renameSync(src, dest);
     }
   }
 
+  writeFileAtomic(orderPath(id), JSON.stringify(order, null, 2));
   return order;
 }
 
 export function getOrder(id) {
+  if (!isValidOrderId(id)) return null;
   const p = orderPath(id);
   if (!fs.existsSync(p)) return null;
   return JSON.parse(fs.readFileSync(p, 'utf-8'));
 }
 
 export function listOrders() {
-  const files = fs.readdirSync(ORDERS_DIR).filter((f) => f.endsWith('.json'));
+  const files = fs.readdirSync(ORDERS_DIR).filter(isOrderFile);
   const orders = files.map((f) => {
     try {
       return JSON.parse(fs.readFileSync(path.join(ORDERS_DIR, f), 'utf-8'));
@@ -202,51 +252,145 @@ export function updateOrder(id, updates) {
   }
   order.updatedAt = new Date().toISOString();
 
-  fs.writeFileSync(orderPath(id), JSON.stringify(order, null, 2));
+  writeFileAtomic(orderPath(id), JSON.stringify(order, null, 2));
   return order;
 }
 
 // -----------------------------------------------------------------
-// Routes
+// Daily backup — one JSON snapshot of every order record, kept for
+// 30 days in orders/backups/. Model files are not copied: each order
+// stores its share link, which rebuilds the exact design.
 // -----------------------------------------------------------------
+const BACKUP_DIR = path.join(ORDERS_DIR, 'backups');
+const BACKUP_KEEP = 30;
 
-// POST /api/checkout — create a Stripe Checkout session.
-// The frontend sends the STL binary + design metadata. We store the
-// STL first (so we have it even if the customer abandons checkout),
-// then create the Checkout session and return the URL.
+export function buildBackup() {
+  return { createdAt: new Date().toISOString(), orders: listOrders() };
+}
+
+export function runBackup() {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const day = new Date().toISOString().slice(0, 10);
+    writeFileAtomic(path.join(BACKUP_DIR, `orders-${day}.json`), JSON.stringify(buildBackup()));
+    const old = fs.readdirSync(BACKUP_DIR).filter((f) => /^orders-.*\.json$/.test(f)).sort();
+    for (const f of old.slice(0, Math.max(0, old.length - BACKUP_KEEP))) {
+      fs.unlinkSync(path.join(BACKUP_DIR, f));
+    }
+  } catch (err) {
+    console.error('Order backup failed:', err.message);
+  }
+}
+setTimeout(runBackup, 60 * 1000).unref();
+setInterval(runBackup, 24 * 60 * 60 * 1000).unref();
+
+// -----------------------------------------------------------------
+// Owner bypass — lets the site owner export without paying.
+// Set ADMIN_BYPASS_KEY in env; visit /design/#bypass=<key>. The key is
+// sent in a POST body (never a URL) and attempts are rate limited.
+// -----------------------------------------------------------------
+ordersRouter.post('/verify-bypass', (req, res) => {
+  if (rateLimit(`bypass:${clientIp(req)}`, 5, 10 * 60 * 1000)) {
+    return res.status(429).json({ valid: false });
+  }
+  const expected = process.env.ADMIN_BYPASS_KEY;
+  const key = req.body?.key;
+  if (!expected || typeof key !== 'string') return res.json({ valid: false });
+  const a = crypto.createHash('sha256').update(key).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  res.json({ valid: crypto.timingSafeEqual(a, b) });
+});
+
+// -----------------------------------------------------------------
+// POST /api/upload-model?format=stl|3mf — raw binary model upload.
+// The browser may gzip the body (Content-Encoding: gzip); express.raw
+// inflates it. Returns an uploadId to pass to a checkout endpoint.
+// -----------------------------------------------------------------
+const MAX_MODEL_BYTES = 60 * 1024 * 1024;
+
+function saveUpload(buffer, format) {
+  const uploadId = crypto.randomBytes(12).toString('hex');
+  fs.writeFileSync(path.join(ORDERS_DIR, `upload_${uploadId}.${format}`), buffer);
+  return uploadId;
+}
+
+function uploadPath(uploadId, format) {
+  return path.join(ORDERS_DIR, `upload_${uploadId}.${format}`);
+}
+
+ordersRouter.post(
+  '/upload-model',
+  (req, res, next) => {
+    if (rateLimit(`upload:${clientIp(req)}`, 10, 60 * 1000)) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  },
+  express.raw({ type: 'application/octet-stream', limit: MAX_MODEL_BYTES }),
+  (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length < 84) {
+      return res.status(400).json({ error: 'Missing model data' });
+    }
+    const format = normalizeFormat(req.query.format);
+    res.json({ uploadId: saveUpload(req.body, format), format });
+  }
+);
+
+// Resolve the model for a checkout request: either a prior upload
+// (uploadId) or, for older cached clients, inline base64.
+function resolveModel(body) {
+  const format = normalizeFormat(body.format);
+  if (isValidExportId(body.uploadId) && fs.existsSync(uploadPath(body.uploadId, format))) {
+    return { uploadId: body.uploadId, format };
+  }
+  if (typeof body.stlBase64 === 'string' && body.stlBase64.length > 0) {
+    return { uploadId: saveUpload(Buffer.from(body.stlBase64, 'base64'), 'stl'), format: 'stl' };
+  }
+  return null;
+}
+
+const clip = (v, n) => String(v ?? '').slice(0, n);
+
+// -----------------------------------------------------------------
+// POST /api/checkout — Stripe Checkout for a physical order.
+// The design record stays on our side (pending_<ref>.json); Stripe
+// metadata carries only the short reference.
+// -----------------------------------------------------------------
 ordersRouter.post('/checkout', async (req, res) => {
-  // Rate limit: max 5 checkout requests per IP per minute
-  const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
-  if (rateLimit(clientIp, 5, 60 * 1000)) {
+  if (rateLimit(clientIp(req), 5, 60 * 1000)) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-
   if (!stripeKey) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { stlBase64, designName, designDetails, quantity, comments, shareUrl } = req.body;
-
-  if (!stlBase64) {
-    return res.status(400).json({ error: 'Missing STL data' });
+  const model = resolveModel(req.body || {});
+  if (!model) {
+    return res.status(400).json({ error: 'Missing model data' });
   }
 
-  // Server-side pricing: $25 per unit, buy 3 get 1 free
-  const qty = Math.min(100, Math.max(1, parseInt(quantity) || 1));
-  const { paidItems, totalCents } = computePrice(qty);
+  const designName = clip(req.body.designName, 120) || 'Custom Chain';
+  const designDetails = clip(req.body.designDetails, 4000);
+  const comments = clip(req.body.comments, 2000);
+  const shareUrl = clip(req.body.shareUrl, 8000);
 
-  // Save the STL to a temp file in orders/ — we'll rename it to the
-  // order ID once the webhook fires.
-  const tempName = `pending_${crypto.randomBytes(8).toString('hex')}.stl`;
-  const tempPath = path.join(ORDERS_DIR, tempName);
-  fs.writeFileSync(tempPath, Buffer.from(stlBase64, 'base64'));
+  // Server-side pricing: $25 per unit, buy 3 get 1 free
+  const qty = Math.min(100, Math.max(1, parseInt(req.body.quantity) || 1));
+  const { paidItems } = computePrice(qty);
+
+  const ref = model.uploadId;
+  const pendingFile = `pending_${ref}.${model.format}`;
+  fs.renameSync(uploadPath(ref, model.format), path.join(ORDERS_DIR, pendingFile));
+  savePending(ref, {
+    type: 'order', designName, designDetails, comments, shareUrl,
+    quantity: qty, modelFile: pendingFile, modelFormat: model.format
+  });
 
   try {
     const stripe = new Stripe(stripeKey);
-
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -255,8 +399,8 @@ ordersRouter.post('/checkout', async (req, res) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Custom Chain: ${designName || 'My Design'} (x${qty})`,
-              description: designDetails || 'Custom 3D-printed pendant necklace'
+              name: `Custom Chain: ${designName} (x${qty})`,
+              description: clip(designDetails, 500) || 'Custom 3D-printed pendant necklace'
             },
             unit_amount: UNIT_PRICE_CENTS
           },
@@ -266,61 +410,57 @@ ordersRouter.post('/checkout', async (req, res) => {
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'AU']
       },
-      metadata: {
-        designName: designName || 'Custom Chain',
-        designDetails: designDetails || '',
-        stlFile: tempName,
-        quantity: String(qty),
-        comments: (comments || '').slice(0, 500),
-        shareUrl: (shareUrl || '').slice(0, 500)
-      },
-      success_url: `${baseUrl}/?order=success`,
-      cancel_url: `${baseUrl}/?order=cancelled`
+      metadata: { type: 'order', ref, quantity: String(qty), designName: clip(designName, 100) },
+      expires_at: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
+      success_url: `${baseUrl}/design/?order=success`,
+      cancel_url: `${baseUrl}/design/?order=cancelled`
     });
 
+    recordEvent('order_checkout');
     res.json({ url: session.url });
   } catch (err) {
     console.error('Stripe checkout creation failed:', err.message);
-    // Clean up temp STL
-    try { fs.unlinkSync(tempPath); } catch {}
+    try { fs.unlinkSync(path.join(ORDERS_DIR, pendingFile)); } catch {}
+    deletePending(ref);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
 // -----------------------------------------------------------------
 // POST /api/export-checkout — $2 per-export Stripe Checkout.
-// Stores the STL temporarily, creates a Stripe session, and after
-// payment the success page triggers the download.
 // -----------------------------------------------------------------
 const EXPORT_PRICE_CENTS = 200; // $2
 
+function exportFilePath(exportId, format) {
+  return path.join(ORDERS_DIR, `export_${exportId}.${format}`);
+}
+
 ordersRouter.post('/export-checkout', async (req, res) => {
-  const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
-  if (rateLimit(clientIp, 5, 60 * 1000)) {
+  if (rateLimit(clientIp(req), 5, 60 * 1000)) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-
   if (!stripeKey) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { stlBase64, designName, format } = req.body;
-
-  if (!stlBase64) {
-    return res.status(400).json({ error: 'Missing STL data' });
+  const model = resolveModel(req.body || {});
+  if (!model) {
+    return res.status(400).json({ error: 'Missing model data' });
   }
 
-  const exportId = crypto.randomBytes(8).toString('hex');
-  const tempName = `export_${exportId}.stl`;
-  const tempPath = path.join(ORDERS_DIR, tempName);
-  fs.writeFileSync(tempPath, Buffer.from(stlBase64, 'base64'));
+  const designName = clip(req.body.designName, 120) || 'necklace';
+  const exportId = model.uploadId;
+  fs.renameSync(uploadPath(exportId, model.format), exportFilePath(exportId, model.format));
+  writeFileAtomic(
+    path.join(ORDERS_DIR, `export_${exportId}.json`),
+    JSON.stringify({ designName, format: model.format })
+  );
 
   try {
     const stripe = new Stripe(stripeKey);
-
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -329,40 +469,38 @@ ordersRouter.post('/export-checkout', async (req, res) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `3D Model Export: ${designName || 'My Design'}`,
-              description: `Export in ${(format || 'stl').toUpperCase()} format`
+              name: `3D Model Export: ${designName}`,
+              description: `${model.format.toUpperCase()} file for 3D printing`
             },
             unit_amount: EXPORT_PRICE_CENTS
           },
           quantity: 1
         }
       ],
-      metadata: {
-        type: 'export',
-        exportId,
-        designName: designName || 'necklace',
-        format: format || 'stl',
-        stlFile: tempName
-      },
-      success_url: `${baseUrl}/?export=success&eid=${exportId}&fmt=${format || 'stl'}&name=${encodeURIComponent(designName || 'necklace')}`,
-      cancel_url: `${baseUrl}/?export=cancelled`
+      metadata: { type: 'export', exportId },
+      expires_at: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
+      success_url: `${baseUrl}/design/?export=success&eid=${exportId}`,
+      cancel_url: `${baseUrl}/design/?export=cancelled`
     });
 
+    recordEvent('export_checkout');
     res.json({ url: session.url });
   } catch (err) {
-    console.error('Export checkout creation failed:', err.message);
-    try { fs.unlinkSync(tempPath); } catch {}
+    console.error('Stripe export checkout failed:', err.message);
+    for (const ext of [model.format, 'json']) {
+      try { fs.unlinkSync(path.join(ORDERS_DIR, `export_${exportId}.${ext}`)); } catch {}
+    }
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
-// Mark an export as paid (called by webhook).
+// Called by the webhook when an export payment completes.
 export function markExportPaid(exportId) {
-  const marker = path.join(ORDERS_DIR, `export_${exportId}.paid`);
-  fs.writeFileSync(marker, new Date().toISOString());
+  if (!isValidExportId(exportId)) return;
+  fs.writeFileSync(path.join(ORDERS_DIR, `export_${exportId}.paid`), '');
 }
 
-// GET /api/export-download/:id — download the paid export STL.
+// GET /api/export-download/:id — download the paid export.
 ordersRouter.get('/export-download/:id', (req, res) => {
   const exportId = req.params.id;
   if (!isValidExportId(exportId)) {
@@ -374,14 +512,92 @@ ordersRouter.get('/export-download/:id', (req, res) => {
     return res.status(402).json({ error: 'Payment not yet confirmed. Please wait a moment and try again.' });
   }
 
-  const filePath = path.join(ORDERS_DIR, `export_${exportId}.stl`);
+  const metaPath = path.join(ORDERS_DIR, `export_${exportId}.json`);
+  let meta = {};
+  try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch {}
+  const format = normalizeFormat(meta.format);
+  const filePath = exportFilePath(exportId, format);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'Export not found or expired' });
   }
-  res.download(filePath, 'necklace.stl', (err) => {
-    if (!err) {
-      try { fs.unlinkSync(filePath); } catch {}
-      try { fs.unlinkSync(paidMarker); } catch {}
+
+  // The file stays available until the temp sweep removes it, so a
+  // dropped connection or a refresh doesn't cost the customer their file.
+  res.setHeader('Content-Type', MODEL_FORMATS[format]);
+  res.download(filePath, `${safeFileStem(meta.designName)}_necklace.${format}`);
+});
+
+// -----------------------------------------------------------------
+// First-party funnel counters (no cookies, no personal data).
+// POST /api/event { name } increments today's count for that event.
+// -----------------------------------------------------------------
+const STATS_PATH = path.join(ORDERS_DIR, 'stats.json');
+const EVENT_NAMES = new Set([
+  'landing_view', 'designer_view', 'share', 'screenshot',
+  'export_click', 'export_checkout', 'export_paid',
+  'order_click', 'order_checkout', 'order_paid'
+]);
+let statsCache = null;
+
+function loadStats() {
+  if (statsCache) return statsCache;
+  try { statsCache = JSON.parse(fs.readFileSync(STATS_PATH, 'utf-8')); } catch { statsCache = {}; }
+  return statsCache;
+}
+
+// A visit's utm_source, if it looks like one of ours (short, simple).
+export function cleanSource(src) {
+  const s = String(src ?? '').toLowerCase();
+  return /^[a-z0-9_-]{1,20}$/.test(s) ? s : null;
+}
+
+const MAX_SOURCES_PER_DAY = 25;
+let statsDirty = false;
+export function recordEvent(name, src) {
+  if (!EVENT_NAMES.has(name)) return;
+  const stats = loadStats();
+  const day = new Date().toISOString().slice(0, 10);
+  stats[day] = stats[day] || {};
+  stats[day][name] = (stats[day][name] || 0) + 1;
+  // Visits also count per traffic source ("src:instagram": 12).
+  const source = (name === 'landing_view' || name === 'designer_view') ? cleanSource(src) : null;
+  if (source) {
+    const key = `src:${source}`;
+    const known = Object.keys(stats[day]).filter((k) => k.startsWith('src:')).length;
+    if (stats[day][key] || known < MAX_SOURCES_PER_DAY) {
+      stats[day][key] = (stats[day][key] || 0) + 1;
     }
-  });
+  }
+  statsDirty = true;
+}
+
+export function flushStats() {
+  if (!statsDirty) return;
+  statsDirty = false;
+  try {
+    const stats = loadStats();
+    const days = Object.keys(stats).sort();
+    for (const d of days.slice(0, Math.max(0, days.length - 400))) delete stats[d];
+    writeFileAtomic(STATS_PATH, JSON.stringify(stats));
+  } catch (err) {
+    console.error('Stats write failed:', err.message);
+  }
+}
+setInterval(flushStats, 30 * 1000).unref();
+
+export function getStats(days = 30) {
+  const stats = loadStats();
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    out.push({ day, ...(stats[day] || {}) });
+  }
+  return out;
+}
+
+ordersRouter.post('/event', (req, res) => {
+  if (!rateLimit(`event:${clientIp(req)}`, 60, 60 * 1000)) {
+    recordEvent(req.body?.name, req.body?.src);
+  }
+  res.status(204).end();
 });

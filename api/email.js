@@ -166,7 +166,7 @@ export async function sendAdminNotification(order) {
       <h3>Ship to:</h3>
       ${shippingBlock(order.shipping)}
       ${order.shareUrl ? `<p><a href="${escapeHtml(order.shareUrl)}">View design in editor</a></p>` : ''}
-      <p><a href="${baseUrl}/admin/api/orders/${escapeHtml(order.id)}/stl">Download STL file</a></p>
+      <p><a href="${baseUrl}/admin/api/orders/${escapeHtml(order.id)}/stl">Download model file</a></p>
       <p><a href="${baseUrl}/admin">Open admin dashboard</a></p>
     </div>
   `;

@@ -19,9 +19,10 @@ function buildExportModal() {
     <div class="export-modal-card" role="dialog" aria-labelledby="export-modal-title">
       <button class="export-modal-close" aria-label="Close">&times;</button>
       <h2 id="export-modal-title">Export Your Design</h2>
-      <p class="export-modal-desc">
+      <p class="export-modal-desc" id="export-modal-desc">
         Download your 3D model ready for printing.
       </p>
+      <div id="export-modal-warnings"></div>
       <div class="export-modal-price">${EXPORT_PRICE_DISPLAY} <span>per export</span></div>
       <button class="export-modal-buy" id="export-modal-buy">
         Pay &amp; Download
@@ -43,11 +44,19 @@ function buildExportModal() {
 
 let _onConfirmExport = null;
 
-export function showExportModal(onConfirm) {
+export function showExportModal(onConfirm, { format = 'stl', warningsHtml = '' } = {}) {
   buildExportModal();
   _onConfirmExport = onConfirm;
   const modal = document.getElementById('export-modal');
   if (!modal) return;
+  const desc = document.getElementById('export-modal-desc');
+  if (desc) {
+    desc.textContent = format === '3mf'
+      ? 'Download your design as a 3MF file. Each colour is a separate part, ready for multi-colour printing.'
+      : 'Download your design as an STL file, ready for slicing and printing.';
+  }
+  const warn = document.getElementById('export-modal-warnings');
+  if (warn) warn.innerHTML = warningsHtml;
   const buyBtn = document.getElementById('export-modal-buy');
   if (buyBtn) {
     buyBtn.disabled = false;

@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Design custom 3D-printed necklaces with personalized text, shapes, and materials. Export STL/OBJ/GLB or order directly.">
-  <meta property="og:title" content="Chain Studio — 3D Necklace Designer">
-  <meta property="og:description" content="Design custom 3D-printed necklaces with personalized text, shapes, and materials.">
+  <meta name="description" content="Design a custom name chain in 3D: pick a pendant shape, fonts and colours, then order it 3D printed for $25 or download the print file for $2.">
+  <link rel="canonical" href="https://hypechain.c23d.shop/design/">
+  <meta property="og:title" content="Design Your Chain — Chain Studio">
+  <meta property="og:description" content="Free 3D name chain designer. Order it printed for $25 or download the print file for $2.">
   <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary">
-  <title>Chain Studio — 3D Necklace Designer</title>
+  <meta property="og:url" content="https://hypechain.c23d.shop/design/">
+  <meta property="og:image" content="https://hypechain.c23d.shop/img/og.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#16213e">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Design Your Chain — Chain Studio</title>
   <style>
     :root {
       --panel-width: 320px;
@@ -377,6 +382,8 @@
       padding: 28px;
       max-width: 420px;
       width: 90%;
+      max-height: calc(100dvh - 24px);
+      overflow-y: auto;
       text-align: center;
     }
 
@@ -696,6 +703,7 @@
       backdrop-filter: blur(4px);
     }
 
+    .export-modal-card { max-height: calc(100dvh - 24px); overflow-y: auto; }
     .export-modal-card {
       position: relative;
       width: min(380px, calc(100vw - 40px));
@@ -931,17 +939,53 @@
     }
 
     /* Mobile responsive */
+    .print-warnings {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(251, 191, 36, 0.5);
+      border-radius: 6px;
+      background: rgba(251, 191, 36, 0.08);
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: left;
+      color: var(--text);
+    }
+    .print-warnings strong { color: #fbbf24; }
+    .print-warnings ul { margin: 4px 0 0 16px; }
+
+    #panel-header a { color: inherit; text-decoration: none; }
+    .panel-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      justify-content: center;
+      padding: 4px 20px 20px;
+      font-size: 11px;
+    }
+    .panel-links a { color: var(--text-dim); text-decoration: none; }
+    .panel-links a:hover { color: var(--gold); }
+
+    .hint-touch { display: none; }
+    @media (pointer: coarse) {
+      .hint-mouse { display: none; }
+      .hint-touch { display: inline; }
+    }
+
     @media (max-width: 768px) {
-      #app { flex-direction: column-reverse; }
+      body { height: 100dvh; }
+      #app { flex-direction: column-reverse; height: 100dvh; }
       #panel {
         width: 100%;
         min-width: 100%;
-        max-height: 50vh;
+        height: 52dvh;
+        flex: none;
         border-right: none;
         border-top: 1px solid var(--border);
       }
-      #viewport-container { flex: 1; min-height: 50vh; }
-      body { overflow: auto; }
+      #viewport { flex: 1; min-height: 0; }
+      #panel-header { padding: 10px 16px; }
+      #panel-header h1 { font-size: 16px; }
+      #viewport-hint { bottom: 6px; font-size: 10px; white-space: nowrap; }
     }
   </style>
 </head>
@@ -949,7 +993,7 @@
   <div id="app">
     <div id="panel">
       <div id="panel-header">
-        <h1>Chain Studio</h1>
+        <h1><a href="/">Chain Studio</a></h1>
         <p>3D Necklace Designer</p>
       </div>
 
@@ -1052,7 +1096,7 @@
         <div class="section-title">Line 1</div>
         <div class="control-group">
           <label for="text-input">Text</label>
-          <input type="text" id="text-input" value="Test" maxlength="16" spellcheck="false">
+          <input type="text" id="text-input" value="Your" maxlength="16" spellcheck="false">
         </div>
         <div class="control-group">
           <label for="font-select">Font</label>
@@ -1526,12 +1570,8 @@
         <div class="control-group">
           <label for="chain-type-select">Style</label>
           <select id="chain-type-select">
-            <option value="rope">Rope</option>
             <option value="twisted-star">Twisted Star</option>
-            <option value="box">Box</option>
             <option value="cuban" selected>Cuban Link</option>
-            <option value="figaro">Figaro</option>
-            <option value="snake">Snake</option>
           </select>
         </div>
         <div class="control-group">
@@ -1608,7 +1648,8 @@
         <div class="control-group">
           <label for="export-format">Format</label>
           <select id="export-format">
-            <option value="stl" selected>STL</option>
+            <option value="stl" selected>STL (single colour)</option>
+            <option value="3mf">3MF (keeps colours as separate parts)</option>
           </select>
         </div>
       </div>
@@ -1635,7 +1676,13 @@
         <button class="btn-action" id="reset-btn">Reset All</button>
       </div>
 
-      <div style="height:20px"></div>
+      <div class="panel-links">
+        <a href="/">Home</a>
+        <a href="/gallery/">Gallery</a>
+        <a href="/terms/">Terms</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="/refunds/">Refunds</a>
+      </div>
     </div>
 
     <div id="viewport">
@@ -1644,7 +1691,7 @@
         <p>Loading chain model...</p>
       </div>
       <div id="dimensions-display"></div>
-      <div id="viewport-hint">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</div>
+      <div id="viewport-hint"><span class="hint-mouse">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</span><span class="hint-touch">Drag to rotate &bull; Pinch to zoom &bull; Two fingers to move</span></div>
     </div>
   </div>
 
@@ -1678,14 +1725,6 @@
     </div>
   </div>
 
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
-    }
-  }
-  </script>
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

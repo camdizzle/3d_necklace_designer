@@ -5,7 +5,10 @@
 
 import express from 'express';
 import Stripe from 'stripe';
-import { createOrder } from './orders.js';
+import {
+  createOrder, findOrderBySession, loadPending, deletePending,
+  markExportPaid, recordEvent
+} from './orders.js';
 import { sendOrderConfirmation, sendAdminNotification } from './email.js';
 
 export const webhookRouter = express.Router();
@@ -46,20 +49,54 @@ webhookRouter.post('/stripe', async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
+    // Delayed payment methods complete the session before the money
+    // arrives; only fulfil once it is actually paid.
+    if (session.payment_status && session.payment_status !== 'paid') {
+      return res.json({ received: true });
+    }
+
     // Export payments ($2) are not orders — just mark them as paid so
     // the download endpoint can verify, then bail out.
     if (session.metadata?.type === 'export') {
       const exportId = session.metadata.exportId;
-      if (exportId) {
-        const { markExportPaid } = await import('./orders.js');
-        markExportPaid(exportId);
-        console.log(`Export ${exportId} marked as paid`);
+      try {
+        if (exportId) {
+          markExportPaid(exportId);
+          recordEvent('export_paid');
+          console.log(`Export ${exportId} marked as paid`);
+        }
+      } catch (err) {
+        console.error('Failed to mark export paid:', err);
+        return res.status(500).send('Export fulfilment failed');
       }
       return res.json({ received: true });
     }
 
+    // Stripe retries and can deliver the same event twice — never
+    // create a second order for a session we've already recorded.
+    if (findOrderBySession(session.id)) {
+      return res.json({ received: true, duplicate: true });
+    }
+
+    // The design record lives on our side, keyed by metadata.ref.
+    // Sessions created before that change carried it all in metadata.
+    const ref = session.metadata?.ref;
+    const pending = ref ? loadPending(ref) : null;
+    if (ref && !pending) {
+      console.error(`Paid session ${session.id} has no pending design record (ref ${ref})`);
+    }
+    const src = pending || {
+      designName: session.metadata?.designName,
+      designDetails: session.metadata?.designDetails,
+      comments: session.metadata?.comments,
+      shareUrl: session.metadata?.shareUrl,
+      modelFile: session.metadata?.stlFile,
+      modelFormat: 'stl'
+    };
+
+    let order;
     try {
-      const order = createOrder({
+      order = createOrder({
         stripeSessionId: session.id,
         stripePaymentIntent: session.payment_intent,
         customerEmail: session.customer_details?.email || '',
@@ -67,27 +104,32 @@ webhookRouter.post('/stripe', async (req, res) => {
         shipping: session.shipping_details || session.collected_information?.shipping_details || null,
         amountTotal: session.amount_total,   // in cents
         currency: session.currency || 'usd',
-        designName: session.metadata?.designName || 'Custom Chain',
-        designDetails: session.metadata?.designDetails || '',
-        stlFile: session.metadata?.stlFile || null,
-        quantity: parseInt(session.metadata?.quantity) || 1,
-        comments: session.metadata?.comments || '',
-        shareUrl: session.metadata?.shareUrl || ''
+        designName: src.designName || session.metadata?.designName || 'Custom Chain',
+        designDetails: src.designDetails || '',
+        stlFile: src.modelFile || null,
+        modelFormat: src.modelFormat || 'stl',
+        quantity: parseInt(session.metadata?.quantity) || src.quantity || 1,
+        comments: src.comments || '',
+        shareUrl: src.shareUrl || ''
       });
-
-      console.log(`Order created: ${order.id} for ${order.customerEmail}`);
-
-      // Fire-and-forget emails — don't fail the webhook if email breaks.
-      sendOrderConfirmation(order).catch((err) =>
-        console.error('Customer email failed:', err.message)
-      );
-      sendAdminNotification(order).catch((err) =>
-        console.error('Admin email failed:', err.message)
-      );
     } catch (err) {
+      // A paid order we failed to save: answer 500 so Stripe retries
+      // (it keeps retrying for days) instead of silently losing it.
       console.error('Failed to create order from webhook:', err);
-      // Still return 200 so Stripe doesn't retry — we logged the error.
+      return res.status(500).send('Order creation failed');
     }
+
+    if (ref) deletePending(ref);
+    recordEvent('order_paid');
+    console.log(`Order created: ${order.id} for ${order.customerEmail}`);
+
+    // Fire-and-forget emails — don't fail the webhook if email breaks.
+    sendOrderConfirmation(order).catch((err) =>
+      console.error('Customer email failed:', err.message)
+    );
+    sendAdminNotification(order).catch((err) =>
+      console.error('Admin email failed:', err.message)
+    );
   }
 
   res.json({ received: true });
