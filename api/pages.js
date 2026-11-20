@@ -236,6 +236,7 @@ ${CTA}`;
 // Gallery
 // ---------------------------------------------------------------------
 pagesRouter.get('/gallery/', (req, res) => {
+  recordEvent('landing_view', req.query.utm_source);
   const body = `
 <section class="section first">
   <h1>Chain design gallery</h1>
@@ -256,6 +257,7 @@ ${CTA}`;
 pagesRouter.get('/gallery/:slug/', (req, res, next) => {
   const item = GALLERY.find((g) => g.slug === req.params.slug);
   if (!item) return next();
+  recordEvent('landing_view', req.query.utm_source);
   const base = baseUrl(req);
   const others = GALLERY.filter((g) => g !== item).slice(0, 4);
   const body = `

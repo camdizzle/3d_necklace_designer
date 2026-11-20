@@ -6,7 +6,7 @@
 //   started with ADMIN_BYPASS_KEY and that key passed as BYPASS_KEY)
 //
 // Usage:  PORT=3999 ADMIN_BYPASS_KEY=k node server.js &
-//         BYPASS_KEY=k node scripts/render-marketing.js [http://localhost:3999]
+//         BYPASS_KEY=k node scripts/render-marketing.js [http://localhost:3999] [slug ...]
 
 import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
@@ -20,7 +20,9 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const base = (process.argv[2] || 'http://localhost:3999').replace(/\/$/, '');
+const args = process.argv.slice(2);
+const base = (args[0] && args[0].startsWith('http') ? args.shift() : 'http://localhost:3999').replace(/\/$/, '');
+const only = new Set(args); // optional slugs to limit image/clip rendering
 const OUT = path.join(ROOT, 'marketing', 'assets');
 const TURNTABLES = ['your-hype-chain', 'best-dad-silver', 'gg-gamer-tag'];
 const SAMPLE_FILES = ['your-hype-chain', 'best-dad-silver', 'king-twisted-star', 'gg-gamer-tag'];
@@ -59,8 +61,18 @@ async function aim(page, { yaw, pitch, pad }) {
       c[2] + dist * Math.cos(yaw) * Math.cos(pitch)
     );
     cs.controls.update();
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   }, { yaw, pitch, pad, bg: BG });
+}
+
+// Read the frame straight from the WebGL canvas (much faster than a
+// browser screenshot when rendering in software).
+async function grab(page, file, quality = 0.9) {
+  const dataUrl = await page.evaluate((q) => {
+    const cs = window.__chainStudio;
+    cs.renderer.render(cs.scene, cs.camera);
+    return cs.renderer.domElement.toDataURL('image/jpeg', q);
+  }, quality);
+  fs.writeFileSync(file, Buffer.from(dataUrl.split(',')[1], 'base64'));
 }
 
 async function openDesign(browser, item, viewport, extraHash = '') {
@@ -77,16 +89,15 @@ const browser = await chromium.launch({
 });
 
 for (const item of GALLERY) {
+  if (only.size && !only.has(item.slug)) continue;
   const { ctx, page } = await openDesign(browser, item, { width: 1080, height: 1350 });
   await page.addStyleTag({ content: HIDE_UI });
-  const canvas = page.locator('#viewport canvas');
 
   for (const [name, w, h, pad] of [['portrait', 1080, 1350, 2.3], ['square', 1080, 1080, 1.9]]) {
     await page.setViewportSize({ width: w, height: h });
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
     await aim(page, { yaw: 0.38, pitch: 0.14, pad });
-    await page.waitForTimeout(250);
-    await canvas.screenshot({ path: path.join(OUT, 'instagram', `${item.slug}-${name}.jpg`), type: 'jpeg', quality: 88 });
+    await grab(page, path.join(OUT, 'instagram', `${item.slug}-${name}.jpg`));
   }
   console.log('images', item.slug);
 
@@ -94,11 +105,11 @@ for (const item of GALLERY) {
     await page.setViewportSize({ width: 1080, height: 1350 });
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
     const frames = fs.mkdtempSync(path.join(os.tmpdir(), 'turntable-'));
-    const N = 96; // 4 s at 24 fps, a seamless side-to-side swing
+    const N = 72; // 3 s at 24 fps (played twice), a seamless side-to-side swing
     for (let i = 0; i < N; i++) {
       const t = (i / N) * Math.PI * 2;
       await aim(page, { yaw: 0.6 * Math.sin(t), pitch: 0.12 + 0.05 * Math.cos(t), pad: 2.3 });
-      await canvas.screenshot({ path: path.join(frames, `f${String(i).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 92 });
+      await grab(page, path.join(frames, `f${String(i).padStart(3, '0')}.jpg`), 0.92);
     }
     execFileSync('ffmpeg', [
       '-y', '-loglevel', 'error', '-stream_loop', '1', '-framerate', '24',
