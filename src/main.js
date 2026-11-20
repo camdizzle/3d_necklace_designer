@@ -3,7 +3,6 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { createScene } from './scene.js';
 import { loadChain, updateChainMaterial } from './chainLoader.js';
 import { generatePendant, updateMaterialOnGroup, createMaterial } from './pendantGenerator.js';
-import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { takeScreenshot, computeDimensions } from './exporter.js';
 import { initUI } from './ui.js';
 import { DEFAULTS } from './constants.js';
@@ -12,6 +11,26 @@ import { initPremium, showExportModal } from './premium.js';
 import { createUndoRedo } from './undoRedo.js';
 import { csAlert, csConfirm, csPrompt } from './modal.js';
 import { stateToShareUrl, loadStateFromUrl, clearShareHash } from './shareUrl.js';
+import {
+  buildExportGroup, exportModel, uploadModel, downloadBuffer, printabilityWarnings
+} from './modelExport.js';
+
+// First-party funnel counter (no cookies, no personal data).
+function track(name) {
+  try {
+    fetch('/api/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+}
+track('designer_view');
+
+// Chain styles that have a real mesh. Older share links may name a
+// style that was only ever a placeholder; those fall back to Cuban.
+const CHAIN_TYPES = ['cuban', 'twisted-star'];
 
 const viewport = document.getElementById('viewport');
 const loading = document.getElementById('loading');
@@ -55,25 +74,34 @@ let reliefImageFile = null;
 const fixedDiameterInput = document.getElementById('fixed-diameter');
 const clearFixedDiameterBtn = document.getElementById('clear-fixed-diameter');
 
-// Admin bypass — visit with ?bypass=<key> to export without paying.
+// Owner bypass — visit /design/#bypass=<key> to export without paying.
+// The key rides in the URL fragment (never sent to the server or its
+// logs) and is checked with a POST.
 let adminBypass = sessionStorage.getItem('admin_bypass') === '1';
-{
-  const bp = new URLSearchParams(window.location.search).get('bypass');
-  if (bp) {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('bypass');
-    window.history.replaceState({}, '', url.toString());
-    fetch(`/api/verify-bypass?key=${encodeURIComponent(bp)}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.valid) {
-          sessionStorage.setItem('admin_bypass', '1');
-          adminBypass = true;
-        }
-      })
-      .catch(() => {});
-  }
+function checkBypassLink() {
+  const url = new URL(window.location.href);
+  const hashMatch = url.hash.match(/^#bypass=(.+)$/);
+  const bp = hashMatch ? decodeURIComponent(hashMatch[1]) : url.searchParams.get('bypass');
+  if (!bp) return;
+  url.searchParams.delete('bypass');
+  if (hashMatch) url.hash = '';
+  window.history.replaceState({}, '', url.toString());
+  fetch('/api/verify-bypass', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: bp })
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.valid) {
+        sessionStorage.setItem('admin_bypass', '1');
+        adminBypass = true;
+      }
+    })
+    .catch(() => {});
 }
+checkBypassLink();
+window.addEventListener('hashchange', checkBypassLink);
 
 function getMaterialOpts(state) {
   return {
@@ -446,65 +474,43 @@ function clearPendingDesign() {
   try { localStorage.removeItem(PENDING_DESIGN_KEY); } catch {}
 }
 
-// Convert an ArrayBuffer to base64 without blocking the main thread.
-// FileReader does the encoding off-thread, avoiding the multi-second
-// String.fromCharCode + btoa loop on large meshes.
-function arrayBufferToBase64(buffer) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(new Blob([buffer]));
-  });
+function designNameParts() {
+  return [state.text, state.secondLineText, state.thirdLineText].filter(Boolean);
 }
 
-// Export ($2 per download via Stripe — bypassed for admin)
-function doDirectDownload() {
-  const exportGroup = new THREE.Group();
-  if (chainMesh && chainMesh.visible) exportGroup.add(chainMesh.clone());
-  exportGroup.add(pendantGroup.clone());
-  exportGroup.updateMatrixWorld(true);
-  const stlBuffer = new STLExporter().parse(exportGroup, { binary: true });
-  const name = [state.text, state.secondLineText, state.thirdLineText]
-    .filter(Boolean).join('_').replace(/\s+/g, '_').toLowerCase() || 'necklace';
-  const blob = new Blob([stlBuffer], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${name}_necklace.stl`;
-  link.click();
-  URL.revokeObjectURL(url);
+function buildModel(format) {
+  const group = buildExportGroup(chainMesh, pendantGroup);
+  return exportModel(group, format, designNameParts().join(' ') || 'Chain Studio design');
 }
 
+function warningsHtml() {
+  const warnings = printabilityWarnings(state, computeDimensions(pendantGroup));
+  if (warnings.length === 0) return '';
+  return '<div class="print-warnings"><strong>Print check</strong><ul>' +
+    warnings.map(w => `<li>${esc(w)}</li>`).join('') + '</ul></div>';
+}
+
+// Export ($2 per download via Stripe — skipped for the owner bypass)
 if (exportBtn) exportBtn.addEventListener('click', async () => {
   if (!pendantGroup) {
     await csAlert('No pendant to export.');
     return;
   }
+  const format = state.exportFormat === '3mf' ? '3mf' : 'stl';
+  track('export_click');
   if (adminBypass) {
-    doDirectDownload();
+    const stem = designNameParts().join('_').replace(/[^A-Za-z0-9]+/g, '_').toLowerCase() || 'necklace';
+    downloadBuffer(buildModel(format), `${stem}_necklace.${format}`);
     return;
   }
   showExportModal(async () => {
     try {
-      const exportGroup = new THREE.Group();
-      if (chainMesh && chainMesh.visible) exportGroup.add(chainMesh.clone());
-      exportGroup.add(pendantGroup.clone());
-      exportGroup.updateMatrixWorld(true);
-
-      const exporter = new STLExporter();
-      const stlBuffer = exporter.parse(exportGroup, { binary: true });
-      const stlBase64 = await arrayBufferToBase64(stlBuffer);
-
-      const designName = [state.text, state.secondLineText, state.thirdLineText].filter(Boolean).join(' / ') || 'necklace';
-      const format = state.exportFormat || 'stl';
+      const uploadId = await uploadModel(buildModel(format), format);
+      const designName = designNameParts().join(' / ') || 'necklace';
       const res = await fetch('/api/export-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stlBase64, designName, format })
+        body: JSON.stringify({ uploadId, designName, format })
       });
 
       if (!res.ok) {
@@ -521,12 +527,13 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
       const buyBtn = document.getElementById('export-modal-buy');
       if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = 'Pay & Download'; }
     }
-  });
+  }, { format, warningsHtml: warningsHtml() });
 });
 
 // Screenshot — always watermark-free
 if (screenshotBtn) {
   screenshotBtn.addEventListener('click', () => {
+    track('screenshot');
     takeScreenshot(renderer, scene, camera, { watermark: false });
   });
 }
@@ -651,6 +658,8 @@ if (orderBtn) {
     }
 
     detailsHtml += `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${esc(state.material)}-tone finish.`;
+    detailsHtml += warningsHtml();
+    track('order_click');
 
     orderModalDetails.innerHTML = detailsHtml;
     orderModal.classList.add('open');
@@ -670,21 +679,15 @@ if (orderBtn) {
           orderModalGo.textContent = 'PROCEED TO CHECKOUT';
           return;
         }
-        const orderGroup = new THREE.Group();
-        if (chainMesh && chainMesh.visible) orderGroup.add(chainMesh.clone());
-        orderGroup.add(pendantGroup.clone());
-        orderGroup.updateMatrixWorld(true);
-        const exporter = new STLExporter();
-        const stlBuffer = exporter.parse(orderGroup, { binary: true });
-        const stlBase64 = await arrayBufferToBase64(stlBuffer);
-
+        const uploadId = await uploadModel(buildModel('stl'), 'stl');
         const shareUrl = stateToShareUrl(state);
 
         const res = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            stlBase64,
+            uploadId,
+            format: 'stl',
             designName,
             designDetails: details,
             quantity: qty,
@@ -756,26 +759,22 @@ if (orderModal) {
   const params = new URLSearchParams(window.location.search);
   const exportStatus = params.get('export');
   if (exportStatus === 'success') {
-    const eid = params.get('eid');
-    const url = new URL(window.location.href);
-    url.searchParams.delete('export');
-    url.searchParams.delete('eid');
-    url.searchParams.delete('fmt');
-    url.searchParams.delete('name');
-    window.history.replaceState({}, '', url.toString());
+    const eid = /^[a-f0-9]+$/.test(params.get('eid') || '') ? params.get('eid') : null;
+    // Keep ?export=success&eid=… in the URL until the download has
+    // started, so a refresh can retry it.
 
     if (eid) {
       // Webhook may not have fired yet — retry a few times with backoff
       async function attemptDownload(retries, delay) {
         const res = await fetch(`/api/export-download/${eid}`);
         if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = 'necklace.stl';
-          link.click();
-          URL.revokeObjectURL(url);
+          const cd = res.headers.get('Content-Disposition') || '';
+          const name = (cd.match(/filename="?([^";]+)"?/) || [])[1] || 'necklace.stl';
+          downloadBuffer(await res.arrayBuffer(), name);
+          const clean = new URL(window.location.href);
+          clean.searchParams.delete('export');
+          clean.searchParams.delete('eid');
+          window.history.replaceState({}, '', clean.toString());
           return;
         }
         if (res.status === 402 && retries > 0) {
@@ -783,6 +782,8 @@ if (orderModal) {
           return attemptDownload(retries - 1, delay * 2);
         }
         console.error('Export download failed:', res.status);
+        csAlert('Your payment went through, but the download did not start. ' +
+          'Refresh this page to try again, or contact us with this reference: ' + esc(eid));
       }
       attemptDownload(5, 1500);
     }
@@ -1085,6 +1086,7 @@ function showToast(message) {
 if (shareBtn) {
   shareBtn.addEventListener('click', async () => {
     const url = stateToShareUrl(state);
+    track('share');
     try {
       await navigator.clipboard.writeText(url);
       showToast('Share link copied to clipboard!');
@@ -1132,10 +1134,11 @@ if (orderBtn) {
   } else if (RETURNED_FROM_STRIPE) {
     restored = loadPendingDesign();
   }
-  clearPendingDesign();
+  if (!RETURNED_FROM_STRIPE) clearPendingDesign();
   if (restored) {
     Object.assign(state, restored);
   }
+  if (!CHAIN_TYPES.includes(state.chainType)) state.chainType = 'cuban';
 
   await init();
 
@@ -1146,4 +1149,11 @@ if (orderBtn) {
 
   // Push initial state into undo history
   undoRedo.pushState(state);
+
+  // Hook for automated renders (scripts/render-gallery.js).
+  window.__chainStudio = {
+    scene, camera, controls, renderer, state, ready: true,
+    get pendant() { return pendantGroup; },
+    get chain() { return chainMesh; }
+  };
 })();

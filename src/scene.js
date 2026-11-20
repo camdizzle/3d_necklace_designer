@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 export function createScene(container) {
   // Renderer
@@ -51,28 +52,10 @@ export function createScene(container) {
   rimLight.position.set(0, -100, -200);
   scene.add(rimLight);
 
-  // Environment map for metallic reflections
+  // Environment map for metallic reflections: a soft studio room gives
+  // the metal finishes real highlights and gradients to reflect.
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
-  const envScene = new THREE.Scene();
-  const envGeo = new THREE.SphereGeometry(100, 16, 16);
-  const envMat = new THREE.MeshBasicMaterial({
-    color: 0x888888,
-    side: THREE.BackSide
-  });
-  envScene.add(new THREE.Mesh(envGeo, envMat));
-
-  // Add some bright spots to env map
-  const spotGeo = new THREE.SphereGeometry(10, 8, 8);
-  const spotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const spot1 = new THREE.Mesh(spotGeo, spotMat);
-  spot1.position.set(50, 50, 50);
-  envScene.add(spot1);
-  const spot2 = new THREE.Mesh(spotGeo, spotMat);
-  spot2.position.set(-30, 80, -20);
-  envScene.add(spot2);
-
-  const envMap = pmremGenerator.fromScene(envScene).texture;
-  scene.environment = envMap;
+  scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
   pmremGenerator.dispose();
 
   // Resize handler

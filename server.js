@@ -15,6 +15,9 @@
 //   EMAIL_API_KEY            Resend API key
 //   EMAIL_FROM               sender address (e.g. orders@yourdomain.com)
 //   BASE_URL                 https://yourdomain.com
+//   CONTACT_EMAIL            shown on the legal pages (defaults to EMAIL_FROM)
+//   LEGACY_HOSTS             comma-separated old hostnames to 301 to BASE_URL
+//   ADMIN_BYPASS_KEY         owner export bypass key
 //   PORT                     (optional, defaults to 3000)
 
 import express from 'express';
@@ -23,6 +26,8 @@ import { fileURLToPath } from 'url';
 import { webhookRouter, rawBodyMiddleware } from './api/webhooks.js';
 import { ordersRouter } from './api/orders.js';
 import { adminRouter } from './api/admin.js';
+import { pagesRouter } from './api/pages.js';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +40,23 @@ for (const key of REQUIRED_ENV) {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.set('trust proxy', 1);
+
+// -------------------------------------------------------------------
+// Old domain → permanent redirect to the canonical address, so search
+// engines index one site and old links keep working.
+// -------------------------------------------------------------------
+const LEGACY_HOSTS = (process.env.LEGACY_HOSTS || 'designer.camwow.tv')
+  .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+app.use((req, res, next) => {
+  const base = process.env.BASE_URL;
+  if (base && LEGACY_HOSTS.includes((req.hostname || '').toLowerCase()) &&
+      !req.path.startsWith('/api/webhooks')) {
+    return res.redirect(301, base.replace(/\/$/, '') + req.originalUrl);
+  }
+  next();
+});
 
 // -------------------------------------------------------------------
 // Security headers
@@ -60,6 +82,8 @@ app.use('/api/webhooks', webhookRouter);
 // -------------------------------------------------------------------
 // Parse JSON for all other routes
 // -------------------------------------------------------------------
+// Legacy clients post base64 models as JSON; current ones upload binary
+// to /api/upload-model, so JSON bodies are small.
 app.use(express.json({ limit: '50mb' }));
 
 // -------------------------------------------------------------------
@@ -73,17 +97,66 @@ app.use('/api', ordersRouter);
 app.use('/admin', adminRouter);
 
 // -------------------------------------------------------------------
-// Static files — serve the Vite build output from dist/
+// Landing, gallery, search and legal pages, robots.txt, sitemap.xml
 // -------------------------------------------------------------------
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(pagesRouter);
 
-// SPA fallback — any non-API, non-admin route serves index.html
-app.get('*', (req, res) => {
-  // Don't intercept API or admin routes that fell through
+// -------------------------------------------------------------------
+// Static files — the Vite build output in dist/. `npm run build` also
+// writes a .gz next to each large text/mesh file; serve that when the
+// browser accepts gzip (the chain meshes shrink by more than half).
+// -------------------------------------------------------------------
+const DIST = path.join(__dirname, 'dist');
+const GZIP_TYPES = {
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.stl': 'model/stl',
+  '.html': 'text/html; charset=utf-8'
+};
+
+function cacheControl(urlPath) {
+  if (urlPath.startsWith('/assets/')) return 'public, max-age=31536000, immutable';
+  if (/\.(stl|json|jpg|jpeg|png|webp|svg|css)$/i.test(urlPath)) return 'public, max-age=86400';
+  return 'no-cache';
+}
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  let rel;
+  try { rel = decodeURIComponent(req.path); } catch { return next(); }
+  if (rel.endsWith('/')) rel += 'index.html';
+  const type = GZIP_TYPES[path.extname(rel).toLowerCase()];
+  if (!type || !/\bgzip\b/.test(req.headers['accept-encoding'] || '')) return next();
+  const file = path.join(DIST, rel);
+  if (!file.startsWith(DIST + path.sep)) return next();
+  fs.stat(file + '.gz', (err, stat) => {
+    if (err || !stat.isFile()) return next();
+    res.setHeader('Content-Type', type);
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Vary', 'Accept-Encoding');
+    res.setHeader('Cache-Control', cacheControl(rel));
+    res.sendFile(file + '.gz', { headers: { 'Content-Type': type } });
+  });
+});
+
+app.use(express.static(DIST, {
+  setHeaders(res, filePath) {
+    res.setHeader('Cache-Control', cacheControl('/' + path.relative(DIST, filePath).split(path.sep).join('/')));
+  }
+}));
+
+// Anything else is a real 404 (search engines must not see a 200 here).
+app.use((req, res) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/admin')) {
     return res.status(404).json({ error: 'Not found' });
   }
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  res.status(404).type('html').send(
+    '<!doctype html><meta charset="utf-8"><title>Page not found — Chain Studio</title>' +
+    '<body style="font-family:system-ui;background:#1a1a2e;color:#eee;text-align:center;padding:15vh 16px">' +
+    '<h1>Page not found</h1><p><a style="color:#FFD700" href="/">Back to Chain Studio</a></p>'
+  );
 });
 
 app.listen(PORT, () => {

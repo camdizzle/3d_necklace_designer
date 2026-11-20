@@ -26,32 +26,32 @@ export const MATERIALS = {
 };
 
 export const FONTS = {
-  helvetiker_bold: 'fonts/helvetiker_bold.typeface.json',
-  helvetiker_regular: 'fonts/helvetiker_regular.typeface.json',
-  optimer_bold: 'fonts/optimer_bold.typeface.json',
-  optimer_regular: 'fonts/optimer_regular.typeface.json',
-  gentilis_bold: 'fonts/gentilis_bold.typeface.json',
-  gentilis_regular: 'fonts/gentilis_regular.typeface.json',
-  droid_sans_bold: 'fonts/droid_sans_bold.typeface.json',
-  droid_sans_regular: 'fonts/droid_sans_regular.typeface.json',
-  droid_serif_bold: 'fonts/droid_serif_bold.typeface.json',
-  droid_serif_regular: 'fonts/droid_serif_regular.typeface.json',
-  dancing_script: 'fonts/dancing_script.typeface.json',
-  pacifico: 'fonts/pacifico.typeface.json',
-  great_vibes: 'fonts/great_vibes.typeface.json',
-  allura: 'fonts/allura.typeface.json',
-  sacramento: 'fonts/sacramento.typeface.json',
-  tangerine: 'fonts/tangerine.typeface.json',
-  alex_brush: 'fonts/alex_brush.typeface.json',
-  kaushan_script: 'fonts/kaushan_script.typeface.json',
-  coiny: 'fonts/coiny.typeface.json',
-  chewy: 'fonts/chewy.typeface.json',
-  sour_gummy: 'fonts/sour_gummy.typeface.json',
-  dynapuff: 'fonts/dynapuff.typeface.json',
-  carter_one: 'fonts/carter_one.typeface.json',
-  bubblegum_sans: 'fonts/bubblegum_sans.typeface.json',
-  archivo_black: 'fonts/archivo_black.typeface.json',
-  alkatra: 'fonts/alkatra.typeface.json'
+  helvetiker_bold: '/fonts/helvetiker_bold.typeface.json',
+  helvetiker_regular: '/fonts/helvetiker_regular.typeface.json',
+  optimer_bold: '/fonts/optimer_bold.typeface.json',
+  optimer_regular: '/fonts/optimer_regular.typeface.json',
+  gentilis_bold: '/fonts/gentilis_bold.typeface.json',
+  gentilis_regular: '/fonts/gentilis_regular.typeface.json',
+  droid_sans_bold: '/fonts/droid_sans_bold.typeface.json',
+  droid_sans_regular: '/fonts/droid_sans_regular.typeface.json',
+  droid_serif_bold: '/fonts/droid_serif_bold.typeface.json',
+  droid_serif_regular: '/fonts/droid_serif_regular.typeface.json',
+  dancing_script: '/fonts/dancing_script.typeface.json',
+  pacifico: '/fonts/pacifico.typeface.json',
+  great_vibes: '/fonts/great_vibes.typeface.json',
+  allura: '/fonts/allura.typeface.json',
+  sacramento: '/fonts/sacramento.typeface.json',
+  tangerine: '/fonts/tangerine.typeface.json',
+  alex_brush: '/fonts/alex_brush.typeface.json',
+  kaushan_script: '/fonts/kaushan_script.typeface.json',
+  coiny: '/fonts/coiny.typeface.json',
+  chewy: '/fonts/chewy.typeface.json',
+  sour_gummy: '/fonts/sour_gummy.typeface.json',
+  dynapuff: '/fonts/dynapuff.typeface.json',
+  carter_one: '/fonts/carter_one.typeface.json',
+  bubblegum_sans: '/fonts/bubblegum_sans.typeface.json',
+  archivo_black: '/fonts/archivo_black.typeface.json',
+  alkatra: '/fonts/alkatra.typeface.json'
 };
 
 // Script/cursive fonts — rendered with preserved case, finer curves, smaller bevels
@@ -102,7 +102,7 @@ export const OUTLINE_FONTS = [
 
 export const DEFAULTS = {
   // Line 1
-  text: 'Test',
+  text: 'Your',
   font: 'coiny',
   textSize: 24,
   textCurve: 0,
