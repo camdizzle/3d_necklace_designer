@@ -12,7 +12,7 @@ fulfillment, and a password-protected admin dashboard.
 
 ## Stack
 
-- **Designer:** Vite + Three.js (vanilla JS). Source in `src/`, entry `design/index.html`, served at `/design/`.
+- **Designer:** Vite + Three.js (vanilla JS). Source in `src/`, entry `src/design/index.html` (Vite root is `src/`), built to `dist/design/` and served at `/design/`.
 - **Site pages:** landing, gallery, search pages, legal pages, `robots.txt` and `sitemap.xml` are rendered by Express (`api/pages.js`, styles in `public/site.css`, example designs in `data/gallery.js`).
 - **Backend:** Express (`server.js`) serving the built `dist/` plus the API.
 - **Storage:** file-based orders in `orders/` (JSON + STL). No database.
