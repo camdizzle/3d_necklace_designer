@@ -281,6 +281,10 @@
     <h2 style="font-size:14px;color:var(--gold);letter-spacing:1px;margin:32px 0 8px;">LAST 30 DAYS</h2>
     <div id="funnel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;"></div>
     <p id="sources" style="font-size:13px;margin-top:10px;"></p>
+    <p id="paid-sources" style="font-size:13px;margin-top:4px;"></p>
+
+    <h2 style="font-size:14px;color:var(--gold);letter-spacing:1px;margin:32px 0 8px;">BROWSER ERRORS</h2>
+    <div id="client-errors" style="font-size:12px;"></div>
     <p class="refresh-hint" style="text-align:left;margin-top:8px;">Anonymous daily counts recorded by the site itself. Visits include search-engine crawlers.</p>
     <p style="margin-top:20px;"><a class="btn" href="/admin/api/backup" style="text-decoration:none;">Download order backup</a>
     <span class="refresh-hint" style="margin-left:8px;">A snapshot is also saved on the server every day and kept for 30 days.</span></p>
@@ -324,7 +328,6 @@
       <textarea id="modal-notes" placeholder="Internal notes..."></textarea>
 
       <div class="btn-row">
-        <button class="btn" id="modal-stl">Download model</button>
         <button class="btn" id="modal-close">Cancel</button>
         <button class="btn primary" id="modal-save">Save</button>
       </div>
@@ -398,8 +401,8 @@
           <div>
             <div class="order-id">${o.id}</div>
             <div class="order-date">${timeAgo(o.createdAt)}</div>
-            <div class="order-design">${esc(o.designName)}</div>
-            <div class="order-customer">${esc(o.customerName)} &mdash; ${esc(o.customerEmail)}</div>
+            <div class="order-design">${esc(o.designName)}${o.items && o.items.length > 1 ? ` <span style="color:var(--dim);font-weight:400;">(${o.items.length} designs, ${o.quantity} chains)</span>` : ''}</div>
+            <div class="order-customer">${esc(o.customerName)} &mdash; ${esc(o.customerEmail)}${o.source ? ` &middot; from ${esc(o.source)}` : ''}</div>
           </div>
           <div style="text-align:center;">
             <span class="badge ${o.status}">${o.status}</span>
@@ -440,14 +443,23 @@
 
       document.getElementById('modal-title').textContent = `Order ${id}`;
       document.getElementById('modal-status').value = order.status;
-      document.getElementById('modal-design').textContent =
-        `${order.designName}${order.designDetails ? '\n' + order.designDetails : ''}`;
-      const shareLinkEl = document.getElementById('modal-share-link');
-      if (order.shareUrl) {
-        shareLinkEl.innerHTML = `<a href="${esc(order.shareUrl)}" target="_blank" style="color:var(--gold);font-size:12px;">Open design in editor &rarr;</a>`;
-      } else {
-        shareLinkEl.innerHTML = '';
-      }
+      const items = order.items && order.items.length
+        ? order.items
+        : [{ designName: order.designName, designDetails: order.designDetails, shareUrl: order.shareUrl, quantity: order.quantity }];
+      const multi = items.length > 1;
+      document.getElementById('modal-design').textContent = multi
+        ? `${items.length} designs, ${order.quantity} chains${order.source ? ' · from ' + order.source : ''}`
+        : `${order.designName}${order.designDetails ? '\n' + order.designDetails : ''}${order.source ? '\nFrom: ' + order.source : ''}`;
+      document.getElementById('modal-share-link').innerHTML = items.map((it, i) => {
+        const links = [
+          it.shareUrl ? `<a href="${esc(it.shareUrl)}" target="_blank" style="color:var(--gold);">Open in editor</a>` : '',
+          `<a href="/admin/api/orders/${encodeURIComponent(order.id)}/stl${multi ? '?item=' + (i + 1) : ''}" style="color:var(--gold);">Download model</a>`
+        ].filter(Boolean).join(' · ');
+        if (!multi) return `<div style="font-size:12px;">${links}</div>`;
+        return `<div style="margin:8px 0;padding:8px;background:var(--card);border-radius:4px;font-size:12px;">
+          <strong>Design ${i + 1}: ${esc(it.designName)} × ${it.quantity || 1}</strong>
+          <div style="white-space:pre-wrap;color:var(--dim);margin:4px 0;">${esc(it.designDetails || '')}</div>${links}</div>`;
+      }).join('');
       const commentsBlock = document.getElementById('modal-comments-block');
       if (order.comments) {
         document.getElementById('modal-comments').textContent = order.comments;
@@ -486,11 +498,6 @@
       }
     });
 
-    document.getElementById('modal-stl').addEventListener('click', () => {
-      if (currentOrderId) {
-        window.open(`/admin/api/orders/${currentOrderId}/stl`, '_blank');
-      }
-    });
 
     document.getElementById('modal-save').addEventListener('click', async () => {
       if (!currentOrderId) return;
@@ -542,6 +549,14 @@
         days.forEach((d) => Object.keys(d).filter((k) => k.startsWith('src:')).forEach((k) => {
           sources[k.slice(4)] = (sources[k.slice(4)] || 0) + d[k];
         }));
+        const paid = {};
+        days.forEach((d) => Object.keys(d).filter((k) => k.startsWith('paid:')).forEach((k) => {
+          paid[k.slice(5)] = (paid[k.slice(5)] || 0) + d[k];
+        }));
+        const paidNames = Object.keys(paid).sort((a, b) => paid[b] - paid[a]);
+        document.getElementById('paid-sources').textContent = paidNames.length
+          ? 'Payments by source (orders and files): ' + paidNames.map((n) => `${n} ${paid[n]}`).join(' · ')
+          : '';
         const names = Object.keys(sources).sort((a, b) => sources[b] - sources[a]);
         document.getElementById('sources').textContent = names.length
           ? 'Visits by source (utm_source): ' + names.map((n) => `${n} ${sources[n]}`).join(' · ')
@@ -549,8 +564,25 @@
       } catch {}
     }
 
+    async function fetchErrors() {
+      try {
+        const res = await fetch('/admin/api/client-errors');
+        if (!res.ok) return;
+        const list = await res.json();
+        document.getElementById('client-errors').innerHTML = list.length
+          ? list.slice(0, 20).map((e) => `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
+              <span style="color:var(--dim);">${esc(new Date(e.at).toLocaleString())}${e.count > 1 ? ` · ${e.count}×` : ''}</span>
+              <div>${esc(e.message)}</div>
+              <div style="color:var(--dim);">${esc([e.where, e.page].filter(Boolean).join(' · '))}</div>
+              <div style="color:var(--dim);">${esc(e.ua || '')}</div></div>`).join('')
+          : '<span style="color:var(--dim);">None reported. Visitors\' browsers report designer errors here automatically.</span>';
+      } catch {}
+    }
+
     fetchOrders();
     fetchStats();
+    fetchErrors();
+    setInterval(fetchErrors, 60000);
     setInterval(fetchOrders, 30000);
     setInterval(fetchStats, 60000);
   </script>

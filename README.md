@@ -34,12 +34,19 @@ npm run build          # outputs dist/
 npm start              # Express on :3000 (or $PORT)
 ```
 
-## Tests
+## Tests and checks
 
 ```bash
-npm test               # Node built-in runner: pricing, ID validation, and the
-                       # upload → webhook → order / paid-download paths
+npm test               # pricing, IDs, upload → webhook → order (single and
+                       # multi-design), paid downloads, share links, error
+                       # reports, admin lockout
+npm run build && npm run smoke   # starts the server and checks the site and
+                       # designer in Chromium (needs Playwright)
+npm run check-live -- https://hypechain.c23d.shop   # run after every deploy
 ```
+
+GitHub runs `npm test`, the build and the smoke test on every pull request
+(`.github/workflows/ci.yml`).
 
 ## Environment variables
 
@@ -75,10 +82,15 @@ them in the Plesk Node.js panel in production).
 | `GET` | `/api/export-download/:id` | Download a paid export (402 until paid). |
 | `POST` | `/api/verify-bypass` | Check the owner bypass key (rate limited). |
 | `POST` | `/api/event` | Anonymous funnel counter. |
+| `POST` | `/api/share` | Save a design + preview picture; returns a short `/d/<id>` link. |
+| `GET` | `/d/:id`, `/d/:id.jpg` | Short share link (link preview shows the design) and its picture. |
+| `POST` | `/api/client-error` | Error report from a visitor's browser (shown in the admin page). |
 | `POST` | `/api/webhooks/stripe` | Stripe webhook (`checkout.session.completed`). |
 | `GET` | `/admin` | Password-protected order dashboard. |
 | `GET/PUT` | `/admin/api/orders[/:id]` | List / update orders, set tracking. |
 | `GET` | `/admin/api/stats`, `/admin/api/backup` | Funnel counts; JSON backup of all orders. |
+| `GET` | `/admin/api/client-errors` | Recent browser error reports. |
+| `GET` | `/admin/api/orders/:id/stl?item=N` | Model file for design N of an order. |
 
 ## Deployment (Plesk Node.js)
 
@@ -113,6 +125,15 @@ them in the Plesk Node.js panel in production).
   `export_<id>.paid` marker; the download endpoint returns 402 until it exists.
 - **Temp files** (`upload_*`, `export_*`, `pending_*`) are swept after 4 hours;
   checkout sessions expire after 2.
+- **Chain meshes** are packed at build time (`scripts/pack-meshes.js`) from the
+  STLs in `public/` into `dist/meshes/*.mesh` (about 0.7–0.9 MB each instead of
+  6–7 MB). The designer falls back to the STL if a `.mesh` file is missing.
+- **Font previews** in the designer come from `public/font-previews/`; run
+  `npm run font-previews` after adding a font.
+- **Orders** can hold several designs; every 4th chain across the order is
+  free. Each design's model is stored as `<order id>-<n>.stl`.
+- **Customer photos** for the home page: add them to `public/photos/` and list
+  them in `data/photos.js`.
 - **Gallery images** are rendered from `data/gallery.js` with
   `node scripts/render-gallery.js` (needs Playwright) against a running server.
 - **Search:** after deploying, add the site in Google Search Console and submit

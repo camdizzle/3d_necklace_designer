@@ -4,6 +4,7 @@
 
 import express from 'express';
 import { GALLERY, designUrl } from '../data/gallery.js';
+import { PHOTOS } from '../data/photos.js';
 import { recordEvent } from './orders.js';
 
 export const pagesRouter = express.Router();
@@ -48,6 +49,17 @@ ${index ? '' : '<meta name="robots" content="noindex">'}
 <meta name="theme-color" content="#16213e">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/site.css">
+<script>
+  // Remember where this visitor first came from (?utm_source=…) for 30
+  // days, so a later order can be credited to it. Stays in this browser.
+  try {
+    var s = new URLSearchParams(location.search).get('utm_source');
+    var k = 'cs_source', now = Date.now(), cur = JSON.parse(localStorage.getItem(k) || 'null');
+    if (s && /^[a-z0-9_-]{1,20}$/i.test(s) && !(cur && now - cur.at < 2592e6)) {
+      localStorage.setItem(k, JSON.stringify({ src: s.toLowerCase(), at: now }));
+    }
+  } catch (e) {}
+</script>
 ${head}
 </head>
 <body>
@@ -97,7 +109,7 @@ const PRICING = `<section id="pricing" class="section">
     <div class="price price-main">
       <h3>Printed and shipped</h3>
       <p class="amount">$25 <small>per chain</small></p>
-      <p>We 3D print your design and ship it free to the US, Canada, UK and Australia. Buy 3, get a 4th free.</p>
+      <p>We 3D print your design and ship it free to the US, Canada, UK and Australia. Buy 3, get a 4th free, even with a different name on each.</p>
     </div>
     <div class="price">
       <h3>Print it yourself</h3>
@@ -136,7 +148,7 @@ function faqLd(faqs) {
 
 const HOME_FAQ = [
   ['What is the chain made of?', 'Each chain is 3D printed in plastic and finished in a gold, silver, rose gold or platinum tone. It is not metal, which keeps it light, bold and affordable.'],
-  ['How much does it cost?', 'Designing is free. A printed chain is $25 with free shipping, and every 4th chain in an order is free. A print file for your own 3D printer is $2.'],
+  ['How much does it cost?', 'Designing is free. A printed chain is $25 with free shipping, and every 4th chain in an order is free, even if each one has a different name. A print file for your own 3D printer is $2.'],
   ['Where do you ship?', 'We ship printed chains to the United States, Canada, the United Kingdom and Australia. You get an email with a tracking number when your chain ships.'],
   ['Can I print it myself?', 'Yes. Export an STL for any 3D printer, or a 3MF that keeps every colour as a separate part so a multi-colour printer can assign a filament to each one.'],
   ['Do I need an account?', 'No. Open the designer and start. You only enter details at checkout, which is handled by Stripe.'],
@@ -175,9 +187,16 @@ pagesRouter.get('/', (req, res) => {
   </ol>
 </section>
 
+${PHOTOS.length ? `<section class="section">
+  <h2>From our customers</h2>
+  <div class="cards">
+${PHOTOS.map((p) => `    <figure class="card photo"><img src="/photos/${esc(p.file)}" alt="${esc(p.alt)}" loading="lazy"><figcaption>${esc(p.caption || '')}</figcaption></figure>`).join('\n')}
+  </div>
+</section>` : ''}
+
 <section class="section">
   <h2>Made with Chain Studio</h2>
-  <p class="sub">Open any design and make it yours.</p>
+  <p class="sub">3D previews from the designer. Open any design and make it yours.</p>
   <div class="cards">
 ${GALLERY.slice(0, 8).map(galleryCard).join('\n')}
   </div>
@@ -313,7 +332,7 @@ const INTENT_PAGES = [
     faqs: [
       ['How long can the name be?', 'Each line holds up to about 16 to 20 characters, and you can use up to three lines. Shorter text prints with bolder letters.'],
       ['Can I match team or school colours?', 'Yes. Every line of text takes any colour, and the base behind the letters has its own colour too.'],
-      ['Is there a discount for groups?', 'Every 4th chain in an order is free, so a set of four costs the same as three.']
+      ['Is there a discount for groups?', 'Every 4th chain in an order is free, so a set of four costs the same as three. Each chain can have a different name: add each design to the same order.']
     ]
   },
   {

@@ -971,6 +971,176 @@
       .hint-touch { display: inline; }
     }
 
+
+    /* Always-visible order bar over the 3D view */
+    #action-bar {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      width: min(560px, calc(100% - 24px));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px 10px 16px;
+      background: rgba(22, 33, 62, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      backdrop-filter: blur(6px);
+      z-index: 20;
+    }
+    .action-price { font-size: 12px; color: var(--text-dim); line-height: 1.3; }
+    .action-price strong { color: var(--gold); font-size: 15px; }
+    .action-buttons { display: flex; gap: 8px; flex: none; }
+    #action-bar button {
+      width: auto;
+      margin: 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: none;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #action-bar .action-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    #action-bar .action-secondary:hover { border-color: var(--gold); color: var(--gold); }
+    #action-bar .action-primary {
+      background: linear-gradient(135deg, var(--gold), #B8860B);
+      color: #1a1a2e;
+      border: none;
+    }
+    #cart-count {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 0 6px;
+      border-radius: 10px;
+      background: #1a1a2e;
+      color: var(--gold);
+      font-size: 11px;
+    }
+    #cart-count[hidden] { display: none; }
+    #viewport-hint { bottom: 86px; }
+
+    /* Cart */
+    .cart-card { max-width: 480px; }
+    .cart-sub, .cart-note { font-size: 12px !important; }
+    .cart-add-current {
+      width: 100%;
+      margin: 8px 0;
+      padding: 10px;
+      border: 1px dashed var(--gold);
+      border-radius: 8px;
+      background: rgba(255, 215, 0, 0.06);
+      color: var(--gold);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .cart-add-current[hidden] { display: none; }
+    .cart-item {
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .cart-item img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; background: #14142a; }
+    .cart-item-name { font-size: 13px; font-weight: 700; color: var(--text); }
+    .cart-item-meta { font-size: 11px; color: var(--text-dim); }
+    .cart-item-meta button {
+      background: none; border: none; padding: 0; margin-right: 10px;
+      color: var(--text-dim); text-decoration: underline; cursor: pointer; font-size: 11px;
+    }
+    .cart-item-meta button:hover { color: var(--gold); }
+    .cart-item-warn { font-size: 11px; color: #fbbf24; }
+    .cart-qty { display: flex; align-items: center; gap: 4px; }
+    .cart-qty button {
+      width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg-input); color: var(--text); cursor: pointer;
+    }
+    .cart-qty span { min-width: 18px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* Panel tools */
+    .panel-tools { padding: 12px 20px 4px; display: grid; gap: 10px; }
+    .panel-tools .btn-action { width: 100%; }
+    .advanced-toggle label { font-size: 12px; color: var(--text-dim); }
+    body:not(.show-advanced) .adv { display: none !important; }
+
+    /* Examples / My designs sheet */
+    .cs-sheet {
+      position: fixed; inset: 0; z-index: 300;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.6);
+    }
+    .cs-sheet[hidden] { display: none; }
+    .cs-sheet-card {
+      width: min(760px, calc(100% - 24px));
+      max-height: calc(100dvh - 24px);
+      overflow-y: auto;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .cs-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .cs-sheet-head h2 { font-size: 16px; color: var(--gold); letter-spacing: 1px; }
+    .cs-sheet-close { background: none; border: none; color: var(--text-dim); font-size: 26px; cursor: pointer; line-height: 1; }
+    .cs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .cs-tile {
+      background: var(--bg-dark); border: 1px solid var(--border); border-radius: 10px;
+      overflow: hidden; text-align: left; color: var(--text); cursor: pointer; padding: 0;
+      font: inherit;
+    }
+    .cs-tile:hover { border-color: var(--gold); }
+    .cs-tile img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: #14142a; }
+    .cs-tile-body { padding: 8px 10px; font-size: 12px; }
+    .cs-tile-body strong { display: block; font-size: 13px; }
+    .cs-tile-actions { display: flex; gap: 12px; padding: 0 10px 10px; font-size: 12px; }
+    .cs-tile-actions button { background: none; border: none; padding: 0; color: var(--gold); cursor: pointer; text-decoration: underline; }
+    .cs-empty { color: var(--text-dim); font-size: 13px; padding: 12px 0; }
+
+    /* Font picker */
+    .font-picker { position: relative; }
+    .font-picker-btn {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-input); color: var(--text); cursor: pointer; min-height: 40px;
+    }
+    .font-picker-btn img { height: 24px; max-width: 85%; object-fit: contain; object-position: left; filter: invert(1); }
+    .font-picker-list {
+      margin-top: 4px;
+      max-height: 300px; overflow-y: auto;
+      background: var(--bg-panel); border: 1px solid var(--gold); border-radius: 8px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    }
+    .font-picker-list[hidden] { display: none; }
+    .font-picker-group { padding: 8px 10px 4px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); }
+    .font-picker-option {
+      display: flex; align-items: center; width: 100%; padding: 6px 10px; border: none;
+      background: none; cursor: pointer; text-align: left;
+    }
+    .font-picker-option:hover, .font-picker-option.active { background: rgba(255, 215, 0, 0.1); }
+    .font-picker-option img { height: 26px; max-width: 100%; object-fit: contain; object-position: left; filter: invert(1); }
+
+    @media (max-width: 768px) {
+      #action-bar { bottom: 8px; padding: 8px 8px 8px 12px; }
+      .action-price { font-size: 11px; }
+      #action-bar button { padding: 9px 11px; font-size: 12px; }
+      #viewport-hint { display: none; }
+    }
+    @media (max-width: 400px) {
+      .action-price { display: none; }
+      #action-bar { justify-content: center; }
+    }
     @media (max-width: 768px) {
       body { height: 100dvh; }
       #app { flex-direction: column-reverse; height: 100dvh; }
@@ -996,6 +1166,13 @@
         <h1><a href="/">Chain Studio</a></h1>
         <p>3D Necklace Designer</p>
       </div>
+      <div class="panel-tools">
+        <button class="btn-action" id="examples-btn">Start from an example</button>
+        <div class="checkbox-row advanced-toggle">
+          <input type="checkbox" id="advanced-toggle">
+          <label for="advanced-toggle">Show advanced settings</label>
+        </div>
+      </div>
 
       <!-- Pendant Shape -->
       <div class="section">
@@ -1015,32 +1192,32 @@
           </select>
         </div>
         <div id="outline-controls" style="display:none">
-          <div class="control-group">
-            <label>Base Fill Depth</label>
+          <div class="control-group adv">
+            <label>Base thickness</label>
             <div class="slider-row">
               <input type="range" id="outline-base-depth" min="1" max="20" value="8" step="0.5">
               <span class="slider-value" id="outline-base-depth-val">8</span>
             </div>
           </div>
-          <div class="control-group">
-            <label>Outline Raised Depth</label>
+          <div class="control-group adv">
+            <label>Letter height above base</label>
             <div class="slider-row">
               <input type="range" id="outline-raised-depth" min="0.5" max="8" value="2" step="0.5">
               <span class="slider-value" id="outline-raised-depth-val">2</span>
             </div>
           </div>
           <div class="control-group">
-            <label>Outline Width</label>
+            <label>Border around letters</label>
             <div class="slider-row">
               <input type="range" id="outline-scale" min="0.2" max="5.0" value="4.5" step="0.1">
               <span class="slider-value" id="outline-scale-val">4.5</span>
             </div>
           </div>
           <div class="control-group">
-            <label>Bottom Layer Color</label>
+            <label>Base colour</label>
             <div class="color-row">
               <input type="color" id="outline-bottom-color" value="#000000">
-              <span style="font-size:11px;color:var(--text-dim)">Back/bottom layer</span>
+              <span style="font-size:11px;color:var(--text-dim)">Colour behind the letters</span>
             </div>
           </div>
         </div>
@@ -1069,7 +1246,7 @@
             <label for="matte-toggle">Matte Finish</label>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Import SVG Shape</label>
           <div class="slider-row">
             <div class="file-input-wrapper" style="flex:1">
@@ -1079,7 +1256,7 @@
             <button id="clear-svg" class="btn-clear" title="Clear SVG">✕</button>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Import STL as Pendant</label>
           <div class="slider-row">
             <div class="file-input-wrapper" style="flex:1">
@@ -1150,48 +1327,48 @@
             <span class="slider-value" id="text-size-val">24</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Curve</label>
           <div class="slider-row">
             <input type="range" id="text-curve" min="-20" max="20" value="0" step="0.1">
             <span class="slider-value" id="text-curve-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Offset X</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Move left / right</label>
           <div class="slider-row">
             <input type="range" id="text-offset-x" min="-30" max="30" value="0" step="0.5">
             <span class="slider-value" id="text-offset-x-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Offset Y</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Move up / down</label>
           <div class="slider-row">
             <input type="range" id="text-offset-y" min="-30" max="30" value="0" step="0.5">
             <span class="slider-value" id="text-offset-y-val">0</span>
           </div>
         </div>
-        <div class="control-group">
+        <div class="control-group adv">
           <label>Letter Spacing</label>
           <div class="slider-row">
             <input type="range" id="letter-spacing" min="-3" max="10" value="0" step="0.5">
             <span class="slider-value" id="letter-spacing-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Extrude Depth</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Letter thickness</label>
           <div class="slider-row">
             <input type="range" id="extrude-depth" min="1" max="20" value="8" step="0.5">
             <span class="slider-value" id="extrude-depth-val">8</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="bevel-toggle" checked>
             <label for="bevel-toggle">Bevel Edges</label>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="align-to-plate-toggle">
             <label for="align-to-plate-toggle">Align to Plate Edge</label>
@@ -1254,48 +1431,48 @@
             <span class="slider-value" id="second-line-size-val">24</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Curve</label>
           <div class="slider-row">
             <input type="range" id="second-line-curve" min="-20" max="20" value="0" step="0.1">
             <span class="slider-value" id="second-line-curve-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Offset X</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Move left / right</label>
           <div class="slider-row">
             <input type="range" id="second-line-offset-x" min="-30" max="30" value="0" step="0.5">
             <span class="slider-value" id="second-line-offset-x-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Offset Y</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Move up / down</label>
           <div class="slider-row">
             <input type="range" id="second-line-offset-y" min="-30" max="30" value="0" step="0.5">
             <span class="slider-value" id="second-line-offset-y-val">0</span>
           </div>
         </div>
-        <div class="control-group">
+        <div class="control-group adv">
           <label>Letter Spacing</label>
           <div class="slider-row">
             <input type="range" id="second-line-letter-spacing" min="-3" max="10" value="0" step="0.5">
             <span class="slider-value" id="second-line-letter-spacing-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Extrude Depth</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Letter thickness</label>
           <div class="slider-row">
             <input type="range" id="second-line-extrude-depth" min="1" max="20" value="8" step="0.5">
             <span class="slider-value" id="second-line-extrude-depth-val">8</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="second-line-bevel-toggle" checked>
             <label for="second-line-bevel-toggle">Bevel Edges</label>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="second-line-align-to-plate-toggle">
             <label for="second-line-align-to-plate-toggle">Align to Plate Edge</label>
@@ -1358,48 +1535,48 @@
             <span class="slider-value" id="third-line-size-val">24</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Curve</label>
           <div class="slider-row">
             <input type="range" id="third-line-curve" min="-20" max="20" value="0" step="0.1">
             <span class="slider-value" id="third-line-curve-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Offset X</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Move left / right</label>
           <div class="slider-row">
             <input type="range" id="third-line-offset-x" min="-30" max="30" value="0" step="0.5">
             <span class="slider-value" id="third-line-offset-x-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Offset Y</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Move up / down</label>
           <div class="slider-row">
             <input type="range" id="third-line-offset-y" min="-30" max="30" value="0" step="0.5">
             <span class="slider-value" id="third-line-offset-y-val">0</span>
           </div>
         </div>
-        <div class="control-group">
+        <div class="control-group adv">
           <label>Letter Spacing</label>
           <div class="slider-row">
             <input type="range" id="third-line-letter-spacing" min="-3" max="10" value="0" step="0.5">
             <span class="slider-value" id="third-line-letter-spacing-val">0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
-          <label>Extrude Depth</label>
+        <div class="control-group adv hide-in-outline">
+          <label>Letter thickness</label>
           <div class="slider-row">
             <input type="range" id="third-line-extrude-depth" min="1" max="20" value="8" step="0.5">
             <span class="slider-value" id="third-line-extrude-depth-val">8</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="third-line-bevel-toggle" checked>
             <label for="third-line-bevel-toggle">Bevel Edges</label>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="third-line-align-to-plate-toggle">
             <label for="third-line-align-to-plate-toggle">Align to Plate Edge</label>
@@ -1418,14 +1595,14 @@
             <option value="right">Right</option>
           </select>
         </div>
-        <div class="control-group">
+        <div class="control-group adv">
           <label>Line Spacing</label>
           <div class="slider-row">
             <input type="range" id="line-spacing" min="0" max="3" value="0.7" step="0.1">
             <span class="slider-value" id="line-spacing-val">0.7</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="engrave-toggle">
             <label for="engrave-toggle">Engrave Text</label>
@@ -1434,7 +1611,7 @@
       </div>
 
       <!-- Image Import -->
-      <div class="section hide-in-outline" id="image-import-section">
+      <div class="section hide-in-outline adv" id="image-import-section">
         <div class="section-title">Image Import</div>
         <div class="control-group">
           <label>Image Silhouette Shape</label>
@@ -1487,16 +1664,16 @@
 
       <!-- Pendant Positioning -->
       <div class="section">
-        <div class="section-title">Pendant Positioning</div>
+        <div class="section-title">Size &amp; Position</div>
 
-        <div class="section-subtitle hide-in-outline">Size</div>
-        <div class="control-group hide-in-outline">
+        <div class="section-subtitle hide-in-outline adv">Size</div>
+        <div class="control-group adv hide-in-outline">
           <div class="checkbox-row">
             <input type="checkbox" id="lock-pendant-size">
             <label for="lock-pendant-size">Lock Pendant Size</label>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Fixed Diameter (mm)</label>
           <div class="slider-row">
             <input type="number" id="fixed-diameter" min="0" max="200" value="" step="1" placeholder="Auto"
@@ -1511,28 +1688,28 @@
             <span class="slider-value" id="pendant-scale-val">1.0</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Padding</label>
           <div class="slider-row">
             <input type="range" id="plate-padding" min="-1" max="20" value="8" step="1">
             <span class="slider-value" id="plate-padding-val">8</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Plate Thickness</label>
           <div class="slider-row">
             <input type="range" id="plate-thickness" min="1" max="10" value="5.5" step="0.5">
             <span class="slider-value" id="plate-thickness-val">5.5</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Corner Radius</label>
           <div class="slider-row">
             <input type="range" id="plate-radius" min="0" max="15" value="5" step="1">
             <span class="slider-value" id="plate-radius-val">5</span>
           </div>
         </div>
-        <div class="control-group hide-in-outline">
+        <div class="control-group adv hide-in-outline">
           <label>Border Width</label>
           <div class="slider-row">
             <input type="range" id="border-width" min="0" max="8" value="0" step="0.5">
@@ -1540,23 +1717,23 @@
           </div>
         </div>
 
-        <div class="section-subtitle">Position</div>
-        <div class="control-group">
-          <label>Offset X</label>
+        <div class="section-subtitle adv">Position</div>
+        <div class="control-group adv">
+          <label>Move left / right</label>
           <div class="slider-row">
             <input type="range" id="pendant-offset-x" min="-50" max="50" value="1" step="1">
             <span class="slider-value" id="pendant-offset-x-val">1</span>
           </div>
         </div>
-        <div class="control-group">
-          <label>Offset Y</label>
+        <div class="control-group adv">
+          <label>Move up / down</label>
           <div class="slider-row">
             <input type="range" id="pendant-offset-y" min="-50" max="50" value="-4" step="1">
             <span class="slider-value" id="pendant-offset-y-val">-4</span>
           </div>
         </div>
-        <div class="control-group">
-          <label>Offset Z</label>
+        <div class="control-group adv">
+          <label>Move forward / back</label>
           <div class="slider-row">
             <input type="range" id="pendant-offset-z" min="-20" max="20" value="2" step="0.5">
             <span class="slider-value" id="pendant-offset-z-val">2</span>
@@ -1574,14 +1751,14 @@
             <option value="cuban" selected>Cuban Link</option>
           </select>
         </div>
-        <div class="control-group">
+        <div class="control-group adv">
           <label>Scale</label>
           <div class="slider-row">
             <input type="range" id="chain-scale" min="0.3" max="2.0" value="1.0" step="0.05">
             <span class="slider-value" id="chain-scale-val">1.0</span>
           </div>
         </div>
-        <div class="control-group">
+        <div class="control-group adv">
           <div class="checkbox-row">
             <input type="checkbox" id="hide-chain-toggle">
             <label for="hide-chain-toggle">Hide Chain</label>
@@ -1619,7 +1796,7 @@
       </div>
 
       <!-- Viewport / Display -->
-      <div class="section">
+      <div class="section adv">
         <div class="section-title">Display</div>
         <div class="control-group">
           <label>Background Color</label>
@@ -1654,8 +1831,6 @@
         </div>
       </div>
 
-      <button id="export-btn" aria-label="Export 3D model">Export Model</button>
-      <button id="order-btn" aria-label="Order custom chain">Order This Chain</button>
 
       <div class="undo-redo-bar">
         <button id="undo-btn" disabled aria-label="Undo (Ctrl+Z)">Undo <span class="shortcut-hint">Ctrl+Z</span></button>
@@ -1668,8 +1843,8 @@
       </div>
 
       <div class="btn-row" style="margin-top:0">
-        <button class="btn-action" id="save-preset-btn">Save Preset</button>
-        <button class="btn-action" id="load-preset-btn">Load Preset</button>
+        <button class="btn-action" id="save-preset-btn">Save design</button>
+        <button class="btn-action" id="load-preset-btn">My designs</button>
       </div>
 
       <div class="btn-row" style="margin-top:0">
@@ -1697,28 +1872,37 @@
           if (window.__chainStudio) return;
           var p = document.querySelector('#loading p');
           if (p) p.textContent = 'The designer did not load. Please refresh the page; if it keeps happening, try again later.';
+          try {
+            fetch('/api/client-error', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: 'Designer did not start within 20 seconds', where: 'startup', page: location.pathname })
+            });
+          } catch (e) {}
         }, 20000);
       </script>
       <div id="dimensions-display"></div>
+      <div id="action-bar">
+        <div class="action-price"><strong>$25</strong> printed &amp; shipped free &middot; every 4th chain free</div>
+        <div class="action-buttons">
+          <button id="export-btn" class="action-secondary" aria-label="Download the 3D print file for $2">Print file &middot; $2</button>
+          <button id="order-btn" class="action-primary" aria-label="Order this chain printed">Order &middot; $25<span id="cart-count" hidden></span></button>
+        </div>
+      </div>
       <div id="viewport-hint"><span class="hint-mouse">Left-click drag to rotate &bull; Scroll to zoom &bull; Right-click drag to pan</span><span class="hint-touch">Drag to rotate &bull; Pinch to zoom &bull; Two fingers to move</span></div>
     </div>
   </div>
 
   <!-- Order Confirmation Modal -->
-  <div class="order-modal" id="order-modal">
-    <div class="order-modal-card">
-      <h2>Order Your Custom Chain</h2>
-      <p>We'll 3D print your exact design and ship it to you.</p>
-      <div class="order-quantity-row">
-        <label for="order-quantity">Quantity:</label>
-        <button class="qty-btn" id="qty-minus">−</button>
-        <input type="number" id="order-quantity" value="1" min="1" max="99">
-        <button class="qty-btn" id="qty-plus">+</button>
-      </div>
-      <div class="order-preview-wrap" id="order-preview-wrap"></div>
-      <div class="order-modal-price" id="order-modal-price">$25.00 <span>+ free shipping</span></div>
+  <div class="order-modal" id="order-modal" role="dialog" aria-labelledby="cart-title">
+    <div class="order-modal-card cart-card">
+      <h2 id="cart-title">Your order</h2>
+      <p class="cart-sub">Every 4th chain is free, even with a different name on each. Free shipping to the US, Canada, UK and Australia.</p>
+      <button class="cart-add-current" id="cart-add-current" hidden>+ Add the design on screen</button>
+      <div id="cart-items"></div>
+      <div class="order-modal-price" id="order-modal-price"></div>
       <div class="order-discount-note" id="order-discount-note"></div>
-      <div class="order-modal-details" id="order-modal-details"></div>
+      <p class="cart-note">Chains are 3D printed in plastic with a metallic-tone finish. Promo codes can be entered at checkout.</p>
       <div class="control-group" style="text-align:left; margin: 12px 0 16px;">
         <label for="order-comments" style="font-size:12px; color:var(--text-dim); margin-bottom:4px; display:block;">
           <strong style="color:var(--text);">Comments / Special Instructions</strong>
@@ -1728,9 +1912,19 @@
           background:rgba(0,0,0,0.2); color:var(--text); font-size:13px; font-family:inherit;
           resize:vertical;"></textarea>
       </div>
-      <button class="order-modal-go" id="order-modal-go">Proceed to Checkout</button>
+      <button class="order-modal-go" id="order-modal-go">Checkout</button>
       <br>
-      <button class="order-modal-cancel" id="order-modal-cancel">Cancel</button>
+      <button class="order-modal-cancel" id="order-modal-cancel">Keep designing</button>
+    </div>
+  </div>
+
+  <div class="cs-sheet" id="cs-sheet" hidden role="dialog" aria-labelledby="cs-sheet-title">
+    <div class="cs-sheet-card">
+      <div class="cs-sheet-head">
+        <h2 id="cs-sheet-title"></h2>
+        <button class="cs-sheet-close" id="cs-sheet-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="cs-sheet-body"></div>
     </div>
   </div>
 

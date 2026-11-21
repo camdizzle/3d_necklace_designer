@@ -291,9 +291,9 @@ Four chains, pay for three.
 
 Every 4th chain in an order is free. So a bridal party, a team, a group of friends or a family set of four costs $75, with free shipping.
 
-The example here is Bride Squad: pink letters on a white base with a rose gold tone chain. The free 4th chain applies to four of the same design in one order, so it suits matching sets.
+The example here is Bride Squad: pink letters on a white base with a rose gold tone chain. Each chain can have its own name and you still get the 4th free.
 
-How to do a group order: design it, hit Share, send the link to the group chat for a yes, then set the quantity to 4 at checkout.
+How to do a group order: design the first one and press Order, then change the name and add the next design to the same order.
 
 The first slide is a 3D preview. Chains are 3D printed plastic with a metallic-tone finish. We ship to the US, Canada, UK and Australia.
 
@@ -303,7 +303,7 @@ Tag the people you'd order with. Link in bio.
 #bridesmaidgifts #groupgifts #customnecklace #chainstudio #teamgifts
 ```
 
-Note: the site's checkout takes one design and a quantity, so the buy-3-get-1-free deal covers identical chains. Four different names means four separate orders at $25 each. Do not promise different names in one discounted order unless you decide to handle that by hand through the comments box.
+Note: an order can hold several designs, and every 4th chain across the order is free.
 
 ### Post 11 (Week 3, Fri, reel): for people with printers
 

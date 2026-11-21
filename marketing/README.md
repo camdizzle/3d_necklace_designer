@@ -25,8 +25,10 @@ Nothing has been posted for you.
 4. **MakerWorld restricts advertising and outside links.** The drafts mention
    the designer in one plain sentence without a link; read the current
    guidelines before adding one.
-5. **Buy 3 get 1 free covers four of the same design in one order.** Different
-   names are separate orders on the site.
+5. **Buy 3 get 1 free works across different designs.** Customers add each
+   design to the same order (Order → "+ Add the design on screen"), so a
+   bridal party or team can each have their own name and still get the 4th
+   free. **Promo codes** you create in Stripe can be entered at checkout.
 6. **Blanks marked `[OWNER: ...]`** are facts only you know: production and
    delivery times, sizes, test-print settings. Fill them before publishing.
 7. Platform rules were checked through search results, not the platforms' own
@@ -36,9 +38,9 @@ Nothing has been posted for you.
 ## Tracking
 
 Add `?utm_source=<name>` to any link you share (lowercase letters, digits,
-hyphen or underscore, up to 20 characters). The admin dashboard shows visits
-per source and 30-day counts for designer opens, clicks, checkouts and paid
-orders. Orders themselves are not tagged with a source.
+hyphen or underscore, up to 20 characters). A visitor's first source is
+remembered for 30 days, so the admin dashboard shows visits per source,
+payments per source, and the source on each order.
 
 ## Regenerating assets
 

@@ -178,9 +178,37 @@ export function findOrderBySession(sessionId) {
   return listOrders().find((o) => o.stripeSessionId === sessionId) || null;
 }
 
+// Model file for an order item: <id>.<fmt> for single-design orders
+// (and every order made before multi-design orders), <id>-<n>.<fmt>
+// for item n (1-based) of a multi-design order.
+export function orderModelName(order, itemIndex = 0) {
+  const items = Array.isArray(order.items) ? order.items : null;
+  if (items && items.length > 1) {
+    const it = items[itemIndex] || items[0];
+    return `${order.id}-${itemIndex + 1}.${normalizeFormat(it.modelFormat)}`;
+  }
+  return `${order.id}.${normalizeFormat(order.modelFormat)}`;
+}
+
 export function createOrder(data) {
   const id = generateId();
   const format = normalizeFormat(data.modelFormat);
+
+  // One entry per design. Older callers pass a single design's fields.
+  const items = (Array.isArray(data.items) && data.items.length ? data.items : [{
+    designName: data.designName, designDetails: data.designDetails, shareUrl: data.shareUrl,
+    quantity: data.quantity, modelFile: data.stlFile, modelFormat: format
+  }]).map((it) => ({
+    designName: it.designName || 'Custom Chain',
+    designDetails: it.designDetails || '',
+    shareUrl: it.shareUrl || '',
+    quantity: Math.max(1, parseInt(it.quantity) || 1),
+    modelFile: it.modelFile || null,
+    modelFormat: normalizeFormat(it.modelFormat)
+  }));
+  const multi = items.length > 1;
+  const totalQty = items.reduce((n, it) => n + it.quantity, 0);
+
   const order = {
     id,
     status: 'new',              // new → printing → shipped → delivered
@@ -193,26 +221,33 @@ export function createOrder(data) {
     shipping: data.shipping || null,
     amountTotal: data.amountTotal || 0,
     currency: data.currency || 'usd',
-    designName: data.designName || 'Custom Chain',
-    designDetails: data.designDetails || '',
-    quantity: data.quantity || 1,
+    // Summary fields (also what orders made before multi-design orders have).
+    designName: multi ? items.map((it) => it.designName).join(' + ') : items[0].designName,
+    designDetails: multi
+      ? items.map((it, i) => `Design ${i + 1} (x${it.quantity}): ${it.designName}\n${it.designDetails}`).join('\n\n')
+      : items[0].designDetails,
+    quantity: data.quantity || totalQty,
     comments: data.comments || '',
-    shareUrl: data.shareUrl || '',
-    modelFormat: format,
+    shareUrl: items[0].shareUrl,
+    modelFormat: items[0].modelFormat,
+    source: cleanSource(data.source) || '',
+    discountTotal: data.discountTotal || 0,
     trackingNumber: null,
     trackingCarrier: null,
     notes: ''
   };
+  if (multi) order.items = items.map(({ modelFile, ...rest }) => rest);
 
-  // Move the uploaded model into place first: if that fails we throw
+  // Move the uploaded models into place first: if that fails we throw
   // before the order exists, and the webhook asks Stripe to retry.
-  if (data.stlFile) {
-    const src = path.join(ORDERS_DIR, path.basename(data.stlFile));
-    const dest = path.join(ORDERS_DIR, `${id}.${format}`);
+  items.forEach((it, i) => {
+    if (!it.modelFile) return;
+    const src = path.join(ORDERS_DIR, path.basename(it.modelFile));
+    const dest = path.join(ORDERS_DIR, orderModelName(order, i));
     if (fs.existsSync(src) && src !== dest) {
       fs.renameSync(src, dest);
     }
-  }
+  });
 
   writeFileAtomic(orderPath(id), JSON.stringify(order, null, 2));
   return order;
@@ -363,6 +398,29 @@ const clip = (v, n) => String(v ?? '').slice(0, n);
 // The design record stays on our side (pending_<ref>.json); Stripe
 // metadata carries only the short reference.
 // -----------------------------------------------------------------
+const MAX_ORDER_DESIGNS = 20;
+
+// The designs in a checkout request: `items` for a multi-design order,
+// or a single design's fields (older cached clients).
+function resolveItems(body) {
+  const raw = Array.isArray(body.items) && body.items.length
+    ? body.items.slice(0, MAX_ORDER_DESIGNS)
+    : [body];
+  const items = [];
+  for (const it of raw) {
+    const model = resolveModel(it || {});
+    if (!model) return null;
+    items.push({
+      model,
+      designName: clip(it.designName, 120) || 'Custom Chain',
+      designDetails: clip(it.designDetails, 4000),
+      shareUrl: clip(it.shareUrl, 8000),
+      quantity: Math.min(100, Math.max(1, parseInt(it.quantity) || 1))
+    });
+  }
+  return items;
+}
+
 ordersRouter.post('/checkout', async (req, res) => {
   if (rateLimit(clientIp(req), 5, 60 * 1000)) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
@@ -374,50 +432,71 @@ ordersRouter.post('/checkout', async (req, res) => {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const model = resolveModel(req.body || {});
-  if (!model) {
-    return res.status(400).json({ error: 'Missing model data' });
+  const body = req.body || {};
+  const items = resolveItems(body);
+  if (!items) {
+    return res.status(400).json({ error: 'Missing model data. Please try again.' });
   }
 
-  const designName = clip(req.body.designName, 120) || 'Custom Chain';
-  const designDetails = clip(req.body.designDetails, 4000);
-  const comments = clip(req.body.comments, 2000);
-  const shareUrl = clip(req.body.shareUrl, 8000);
+  const comments = clip(body.comments, 2000);
+  const source = cleanSource(body.source) || '';
 
-  // Server-side pricing: $25 per unit, buy 3 get 1 free
-  const qty = Math.min(100, Math.max(1, parseInt(req.body.quantity) || 1));
+  // Server-side pricing: $25 per chain, every 4th chain across the whole
+  // order is free (designs can differ).
+  const qty = Math.min(100, items.reduce((n, it) => n + it.quantity, 0));
   const { paidItems } = computePrice(qty);
+  const freeItems = qty - paidItems;
 
-  const ref = model.uploadId;
-  const pendingFile = `pending_${ref}.${model.format}`;
-  fs.renameSync(uploadPath(ref, model.format), path.join(ORDERS_DIR, pendingFile));
-  savePending(ref, {
-    type: 'order', designName, designDetails, comments, shareUrl,
-    quantity: qty, modelFile: pendingFile, modelFormat: model.format
-  });
+  const ref = crypto.randomBytes(12).toString('hex');
+  const pendingFiles = [];
+  const record = {
+    type: 'order', comments, source, quantity: qty,
+    items: items.map((it, i) => {
+      const file = `pending_${ref}_${i + 1}.${it.model.format}`;
+      fs.renameSync(uploadPath(it.model.uploadId, it.model.format), path.join(ORDERS_DIR, file));
+      pendingFiles.push(file);
+      return {
+        designName: it.designName, designDetails: it.designDetails, shareUrl: it.shareUrl,
+        quantity: it.quantity, modelFile: file, modelFormat: it.model.format
+      };
+    })
+  };
+  savePending(ref, record);
+
+  const names = items.map((it) => it.designName);
+  const title = items.length === 1
+    ? `Custom Chain: ${names[0]} (x${qty})`
+    : `Custom Chains: ${items.length} designs, ${qty} chains`;
+  const description = [
+    items.map((it) => `${it.designName} x${it.quantity}`).join(', '),
+    freeItems ? `${freeItems} free (buy 3 get 1 free)` : ''
+  ].filter(Boolean).join(' — ');
 
   try {
     const stripe = new Stripe(stripeKey);
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Custom Chain: ${designName} (x${qty})`,
-              description: clip(designDetails, 500) || 'Custom 3D-printed pendant necklace'
+              name: clip(title, 250),
+              description: clip(description, 500) || 'Custom 3D-printed pendant necklace'
             },
             unit_amount: UNIT_PRICE_CENTS
           },
           quantity: paidItems
         }
       ],
+      allow_promotion_codes: true,
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'AU']
       },
-      metadata: { type: 'order', ref, quantity: String(qty), designName: clip(designName, 100) },
+      metadata: {
+        type: 'order', ref, quantity: String(qty), designs: String(items.length),
+        designName: clip(names.join(' + '), 100), source
+      },
       expires_at: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
       success_url: `${baseUrl}/design/?order=success`,
       cancel_url: `${baseUrl}/design/?order=cancelled`
@@ -427,7 +506,9 @@ ordersRouter.post('/checkout', async (req, res) => {
     res.json({ url: session.url });
   } catch (err) {
     console.error('Stripe checkout creation failed:', err.message);
-    try { fs.unlinkSync(path.join(ORDERS_DIR, pendingFile)); } catch {}
+    for (const f of pendingFiles) {
+      try { fs.unlinkSync(path.join(ORDERS_DIR, f)); } catch {}
+    }
     deletePending(ref);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
@@ -459,18 +540,18 @@ ordersRouter.post('/export-checkout', async (req, res) => {
   }
 
   const designName = clip(req.body.designName, 120) || 'necklace';
+  const source = cleanSource(req.body.source) || '';
   const exportId = model.uploadId;
   fs.renameSync(uploadPath(exportId, model.format), exportFilePath(exportId, model.format));
   writeFileAtomic(
     path.join(ORDERS_DIR, `export_${exportId}.json`),
-    JSON.stringify({ designName, format: model.format })
+    JSON.stringify({ designName, format: model.format, source })
   );
 
   try {
     const stripe = new Stripe(stripeKey);
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
@@ -484,7 +565,8 @@ ordersRouter.post('/export-checkout', async (req, res) => {
           quantity: 1
         }
       ],
-      metadata: { type: 'export', exportId },
+      allow_promotion_codes: true,
+      metadata: { type: 'export', exportId, source },
       expires_at: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
       success_url: `${baseUrl}/design/?export=success&eid=${exportId}`,
       cancel_url: `${baseUrl}/design/?export=cancelled`
@@ -542,7 +624,7 @@ const STATS_PATH = path.join(ORDERS_DIR, 'stats.json');
 const EVENT_NAMES = new Set([
   'landing_view', 'designer_view', 'share', 'screenshot',
   'export_click', 'export_checkout', 'export_paid',
-  'order_click', 'order_checkout', 'order_paid'
+  'order_click', 'order_checkout', 'order_paid', 'client_error'
 ]);
 let statsCache = null;
 
@@ -566,11 +648,14 @@ export function recordEvent(name, src) {
   const day = new Date().toISOString().slice(0, 10);
   stats[day] = stats[day] || {};
   stats[day][name] = (stats[day][name] || 0) + 1;
-  // Visits also count per traffic source ("src:instagram": 12).
-  const source = (name === 'landing_view' || name === 'designer_view') ? cleanSource(src) : null;
+  // Visits count per traffic source ("src:instagram": 12) and payments
+  // per source the buyer first arrived from ("paid:instagram": 2).
+  const prefix = (name === 'landing_view' || name === 'designer_view') ? 'src'
+    : (name === 'order_paid' || name === 'export_paid') ? 'paid' : null;
+  const source = prefix ? cleanSource(src) : null;
   if (source) {
-    const key = `src:${source}`;
-    const known = Object.keys(stats[day]).filter((k) => k.startsWith('src:')).length;
+    const key = `${prefix}:${source}`;
+    const known = Object.keys(stats[day]).filter((k) => k.startsWith(`${prefix}:`)).length;
     if (stats[day][key] || known < MAX_SOURCES_PER_DAY) {
       stats[day][key] = (stats[day][key] || 0) + 1;
     }
@@ -605,6 +690,57 @@ export function getStats(days = 30) {
 ordersRouter.post('/event', (req, res) => {
   if (!rateLimit(`event:${clientIp(req)}`, 60, 60 * 1000)) {
     recordEvent(req.body?.name, req.body?.src);
+  }
+  res.status(204).end();
+});
+
+// -----------------------------------------------------------------
+// Browser error reports: POST /api/client-error { message, where }.
+// Keeps the latest 100 for the admin page and counts them per day, so a
+// broken deploy shows up without anyone having to notice it first.
+// -----------------------------------------------------------------
+const ERRORS_PATH = path.join(ORDERS_DIR, 'client-errors.json');
+const MAX_ERRORS = 100;
+let errorsCache = null;
+
+function loadErrors() {
+  if (errorsCache) return errorsCache;
+  try { errorsCache = JSON.parse(fs.readFileSync(ERRORS_PATH, 'utf-8')); } catch { errorsCache = []; }
+  if (!Array.isArray(errorsCache)) errorsCache = [];
+  return errorsCache;
+}
+
+export function recordClientError({ message, where, page, ua }) {
+  const list = loadErrors();
+  const entry = {
+    at: new Date().toISOString(),
+    message: clip(message, 500) || 'Unknown error',
+    where: clip(where, 200),
+    page: clip(page, 200),
+    ua: clip(ua, 160)
+  };
+  // Collapse repeats of the same error into a count.
+  const same = list.find((e) => e.message === entry.message && e.where === entry.where);
+  if (same) {
+    same.count = (same.count || 1) + 1;
+    same.at = entry.at;
+  } else {
+    list.unshift(entry);
+    list.length = Math.min(list.length, MAX_ERRORS);
+  }
+  list.sort((a, b) => (a.at < b.at ? 1 : -1));
+  recordEvent('client_error');
+  try { writeFileAtomic(ERRORS_PATH, JSON.stringify(list)); } catch {}
+}
+
+export function getClientErrors() {
+  return loadErrors();
+}
+
+ordersRouter.post('/client-error', (req, res) => {
+  if (!rateLimit(`err:${clientIp(req)}`, 20, 10 * 60 * 1000)) {
+    const b = req.body || {};
+    recordClientError({ message: b.message, where: b.where, page: b.page, ua: req.get('user-agent') });
   }
   res.status(204).end();
 });

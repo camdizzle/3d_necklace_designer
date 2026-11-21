@@ -97,7 +97,7 @@ What that lets you measure:
 
 What it cannot measure:
 
-- **Which ad produced a given order.** Orders are not tagged with a source. You can only compare totals before and during the ads, and use judgement.
+- **Exactly which ad convinced a buyer.** Each order (and each $2 file) now records the `utm_source` the buyer *first* arrived with, remembered in their browser for 30 days. It shows on the order in the admin page and as "Payments by source" in the dashboard. It is first-visit credit: someone who first came from a story and later bought after an ad is credited to the story.
 - **What an ad visitor did after the landing page.** When someone lands on a page with `utm_source` and then taps "Start designing", the tag is not carried into the designer, so "Designer opens" is not split by source for those visitors.
 - **`utm_campaign`.** The dashboard only reads `utm_source`. `utm_campaign` is in the links below so they are ready for any future analytics, but today it shows nowhere. That is why each ad has a different `utm_source`.
 - **People, repeat visits, or anything across days.** There are no cookies. A count is page loads, not unique visitors.
@@ -415,7 +415,7 @@ Checked by web search on 20 November 2026. Meta's own policy site (`transparency
 | Boost vs Ads Manager | Boost offers a small set of goals and fewer controls; Ads Manager can also promote an existing post. | [Hootsuite](https://blog.hootsuite.com/boosted-posts-vs-ad/), [Metricool](https://metricool.com/boost-instagram-posts/) |
 | Meta cost ranges (rough) | Cost per click from about $0.29 (Madgicx median, all campaigns) through $0.60 to $0.78 (WordStream/LocaliQ and ContentStudio, traffic campaigns) to about $1.11 (an ecommerce traffic median). Ecommerce cost per 1,000 impressions around $14 to $15. Vendors use different data and definitions; these are context, not predictions. | [Coupler](https://blog.coupler.io/facebook-ads-statistics/), [ContentStudio](https://contentstudio.io/blog/meta-ads-benchmarks), [Madgicx](https://madgicx.com/research/meta-ads-benchmarks), [Triple Whale](https://triplewhale.com/blog/facebook-ads-benchmarks) |
 | Google Search cost (rough) | Median search cost per click of about $4.44 for "Apparel, Fashion & Jewelry", US, April 2025 to March 2026. One vendor's accounts; Google publishes no such table. | [WordStream 2026 benchmarks](https://wordstream.com/blog/2026-google-ads-benchmarks) |
-| What the site's dashboard records | Read from the code in this repo (`api/orders.js`, `api/pages.js`, `src/main.js`, `views/admin.html`): which pages count visits, the `utm_source` format rule, that orders carry no source, and that `utm_campaign` is not read. | This repository |
+| What the site's dashboard records | Read from the code in this repo (`api/orders.js`, `api/pages.js`, `src/main.js`, `views/admin.html`): which pages count visits, the `utm_source` format rule, that each order records the buyer's first `utm_source`, and that `utm_campaign` is not read. | This repository |
 
 ### Not confirmed
 
