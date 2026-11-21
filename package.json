@@ -8,8 +8,8 @@
     "build": "vite build && node scripts/pack-meshes.js && node scripts/precompress.js",
     "preview": "vite preview",
     "start": "node server.js",
-    "test": "node --test",
-    "smoke": "node scripts/smoke-test.js",
+    "test": "node --test test/*.test.js",
+    "smoke": "node scripts/smoke.js",
     "check-live": "node scripts/check-live.js",
     "font-previews": "node scripts/font-previews.js"
   },

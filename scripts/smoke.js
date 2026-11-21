@@ -1,4 +1,4 @@
-// Browser smoke test: builds nothing, starts the server on a spare port
+// Browser smoke test (not part of `npm test`): builds nothing, starts the server on a spare port
 // with a throwaway orders folder, opens the site in Chromium and checks
 // the pages, the designer, the chain and the order window.
 //   npm run build && npm run smoke
