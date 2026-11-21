@@ -15,10 +15,13 @@ process.env.ORDERS_DIR = dir;
 process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
 process.env.ADMIN_BYPASS_KEY = 'owner-key';
+process.env.ADMIN_PASSWORD = 'admin-pass';
 delete process.env.EMAIL_API_KEY;
 
 const orders = await import('../api/orders.js');
 const { webhookRouter, rawBodyMiddleware } = await import('../api/webhooks.js');
+const { sharesRouter } = await import('../api/shares.js');
+const { adminRouter } = await import('../api/admin.js');
 
 let server;
 let base;
@@ -28,6 +31,8 @@ before(async () => {
   app.use('/api/webhooks', webhookRouter);
   app.use(express.json());
   app.use('/api', orders.ordersRouter);
+  app.use(sharesRouter);
+  app.use('/admin', adminRouter);
   await new Promise((resolve) => { server = app.listen(0, resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -157,4 +162,86 @@ test('visit counters record a clean utm_source and ignore junk', () => {
   assert.equal(today['src:instagram'], 1);
   assert.ok(today.landing_view >= 2);
   assert.ok(!Object.keys(today).some((k) => k.includes('<')));
+});
+
+test('a multi-design order keeps every design, its model and its source', async () => {
+  const ref = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+  const A = Buffer.alloc(120, 1);
+  const B = Buffer.alloc(140, 2);
+  fs.writeFileSync(path.join(dir, `pending_${ref}_1.stl`), A);
+  fs.writeFileSync(path.join(dir, `pending_${ref}_2.stl`), B);
+  orders.savePending(ref, {
+    type: 'order', comments: '', source: 'ig-gift', quantity: 4,
+    items: [
+      { designName: 'Maya', designDetails: 'Line 1: "Maya"', shareUrl: 'https://x.test/a', quantity: 3, modelFile: `pending_${ref}_1.stl`, modelFormat: 'stl' },
+      { designName: 'Zoe', designDetails: 'Line 1: "Zoe"', shareUrl: 'https://x.test/b', quantity: 1, modelFile: `pending_${ref}_2.stl`, modelFormat: 'stl' }
+    ]
+  });
+  const res = await sendEvent({
+    id: 'cs_test_multi', payment_status: 'paid', amount_total: 7500, currency: 'usd',
+    total_details: { amount_discount: 500 },
+    customer_details: { email: 'g@example.test', name: 'Group' },
+    metadata: { type: 'order', ref, quantity: '4', source: 'ig-gift' }
+  });
+  assert.equal(res.status, 200);
+
+  const order = orders.findOrderBySession('cs_test_multi');
+  assert.equal(order.items.length, 2);
+  assert.equal(order.quantity, 4);
+  assert.equal(order.source, 'ig-gift');
+  assert.equal(order.discountTotal, 500);
+  assert.equal(order.designName, 'Maya + Zoe');
+  assert.deepEqual(fs.readFileSync(path.join(dir, orders.orderModelName(order, 0))), A);
+  assert.deepEqual(fs.readFileSync(path.join(dir, orders.orderModelName(order, 1))), B);
+  assert.equal(orders.getStats(1)[0]['paid:ig-gift'], 1);
+
+  // The admin can download each design's model.
+  const auth = { authorization: 'Basic ' + Buffer.from('admin:admin-pass').toString('base64') };
+  const second = await fetch(`${base}/admin/api/orders/${order.id}/stl?item=2`, { headers: auth });
+  assert.equal(second.status, 200);
+  assert.deepEqual(Buffer.from(await second.arrayBuffer()), B);
+});
+
+test('share links store the design once and serve a preview page and image', async () => {
+  const design = Buffer.from(JSON.stringify({ text: 'Maya', secondLineText: '' })).toString('base64');
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(100, 9)]);
+  const post = () => fetch(`${base}/api/share`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ design, image: 'data:image/jpeg;base64,' + jpeg.toString('base64') })
+  });
+  const first = await (await post()).json();
+  const again = await (await post()).json();
+  assert.match(first.id, /^[a-f0-9]{10}$/);
+  assert.equal(first.id, again.id);
+
+  const page = await (await fetch(`${base}/d/${first.id}`)).text();
+  assert.match(page, /og:image" content="[^"]*\/d\/[a-f0-9]{10}\.jpg"/);
+  assert.match(page, /Maya Hype Chain|Maya Chain|Maya/);
+  assert.ok(page.includes(`/design/#design=${design}`));
+  const img = await fetch(`${base}/d/${first.id}.jpg`);
+  assert.equal(img.headers.get('content-type'), 'image/jpeg');
+
+  const bad = await fetch(`${base}/api/share`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ design: '<x>' })
+  });
+  assert.equal(bad.status, 400);
+  assert.equal((await fetch(`${base}/d/zzzz`)).status, 404);
+});
+
+test('browser error reports are kept, de-duplicated and counted', async () => {
+  const send = () => fetch(`${base}/api/client-error`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ message: 'Chain failed to load', where: 'chainLoader', page: '/design/' })
+  });
+  await send(); await send();
+  const list = orders.getClientErrors();
+  assert.equal(list[0].message, 'Chain failed to load');
+  assert.equal(list[0].count, 2);
+});
+
+test('the admin login locks out after repeated failures', async () => {
+  const bad = { authorization: 'Basic ' + Buffer.from('admin:nope').toString('base64') };
+  let status = 0;
+  for (let i = 0; i < 11; i++) status = (await fetch(`${base}/admin/api/orders`, { headers: bad })).status;
+  assert.equal(status, 429);
 });

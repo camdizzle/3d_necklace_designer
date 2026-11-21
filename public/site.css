@@ -136,3 +136,7 @@ h3 { font-size: 17px; margin-bottom: 6px; }
   html { scroll-behavior: auto; }
   .btn, .card { transition: none; }
 }
+
+.card.photo { margin: 0; }
+.card.photo img { aspect-ratio: 4 / 5; object-fit: cover; width: 100%; }
+.card.photo figcaption { padding: 10px 12px; font-size: 14px; color: var(--dim); }

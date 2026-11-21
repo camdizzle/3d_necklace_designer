@@ -14,6 +14,18 @@ import { stateToShareUrl, loadStateFromUrl, clearShareHash } from './shareUrl.js
 import {
   buildExportGroup, exportModel, uploadModel, downloadBuffer, printabilityWarnings
 } from './modelExport.js';
+import {
+  snapshot, hasUnsavableParts, designKey, designTitle, loadCart, saveCart, clearCart,
+  loadSaved, addSaved, removeSaved, rememberSource, currentSource, MAX_CART_DESIGNS
+} from './designStore.js';
+import { capturePendant } from './capture.js';
+import { openSheet, closeSheet, initSheet, el } from './sheet.js';
+import { initFontPickers, syncFontPickers } from './fontPicker.js';
+import { reportError, initErrorReporting } from './errors.js';
+import { GALLERY } from '../data/gallery.js';
+
+initErrorReporting();
+rememberSource();
 
 // First-party funnel counter (no cookies, no personal data).
 function track(name) {
@@ -43,21 +55,16 @@ const loadPresetBtn = document.getElementById('load-preset-btn');
 const dimensionsEl = document.getElementById('dimensions-display');
 const orderBtn = document.getElementById('order-btn');
 const orderModal = document.getElementById('order-modal');
-const orderModalDetails = document.getElementById('order-modal-details');
 const orderModalGo = document.getElementById('order-modal-go');
 const orderModalCancel = document.getElementById('order-modal-cancel');
 const orderModalPrice = document.getElementById('order-modal-price');
-const orderQuantityInput = document.getElementById('order-quantity');
 const orderDiscountNote = document.getElementById('order-discount-note');
-const qtyMinus = document.getElementById('qty-minus');
-const qtyPlus = document.getElementById('qty-plus');
 const orderCommentsInput = document.getElementById('order-comments');
 
 const undoRedo = createUndoRedo();
 const shareBtn = document.getElementById('share-btn');
 const undoBtn = document.getElementById('undo-btn');
 const redoBtn = document.getElementById('redo-btn');
-const orderPreviewWrap = document.getElementById('order-preview-wrap');
 
 const { scene, camera, renderer, controls } = createScene(viewport);
 
@@ -125,9 +132,20 @@ function getChainMaterialOpts(state) {
   return getMaterialOpts(state);
 }
 
-async function init() {
-  try {
-    const chain = await loadChain(state.material || DEFAULTS.material, state.chainType || DEFAULTS.chainType);
+let loadedChainType = null;
+
+// Load the chain for this design if it isn't the one on screen, then
+// apply its size, visibility and colour.
+async function ensureChain(st) {
+  if (!CHAIN_TYPES.includes(st.chainType)) st.chainType = 'cuban';
+  if (!chainMesh || loadedChainType !== st.chainType) {
+    const matKey = st.twoTone ? st.chainMaterial : st.material;
+    const chain = await loadChain(matKey || DEFAULTS.material, st.chainType);
+    if (chainMesh) {
+      scene.remove(chainMesh);
+      chainMesh.geometry.dispose();
+      chainMesh.material.dispose();
+    }
     chainMesh = chain.mesh;
     chainSize = chain.size;
     chainInfo = {
@@ -139,14 +157,36 @@ async function init() {
       bailXCenter: chain.bailXCenter
     };
     scene.add(chainMesh);
+    loadedChainType = st.chainType;
+  }
+  chainMesh.scale.setScalar(st.chainScale);
+  chainMesh.visible = !st.hideChain;
+  applyChainMaterial(st);
+}
 
+// Rebuild everything from the current settings (presets, undo, examples,
+// saved designs, and each design in an order at checkout).
+async function applyFullState(st) {
+  await ensureChain(st);
+  await rebuildPendant(st);
+  scene.background = new THREE.Color(st.backgroundColor || DEFAULTS.backgroundColor);
+  controls.autoRotate = !!st.autoRotate;
+  updateDimensions();
+  updateShapeVisibility();
+  syncFontPickers();
+}
+
+async function init() {
+  try {
+    await ensureChain(state);
     await rebuildPendant(state);
     frameCamera();
     loading.classList.add('hidden');
     updateDimensions();
   } catch (err) {
     console.error('Failed to load:', err);
-    loading.querySelector('p').textContent = 'Failed to load chain model.';
+    reportError(`Designer failed to load: ${err && err.message ? err.message : err}`, 'init');
+    loading.querySelector('p').textContent = 'The chain model did not load. Please refresh the page.';
   }
 }
 
@@ -297,6 +337,7 @@ async function rebuildPendant(state) {
   updateDimensions();
   } catch (err) {
     console.error('Pendant rebuild failed:', err);
+    reportError(`Pendant rebuild failed: ${err && err.message ? err.message : err}`, 'rebuildPendant');
   }
 }
 
@@ -348,24 +389,6 @@ const state = initUI(async (newState, changedKey) => {
   // Chain type change — reload the chain model
   if (changedKey === 'chainType') {
     try {
-      const matKey = newState.twoTone ? newState.chainMaterial : newState.material;
-      const chain = await loadChain(matKey, newState.chainType);
-      scene.remove(chainMesh);
-      chainMesh.geometry.dispose();
-      chainMesh.material.dispose();
-      chainMesh = chain.mesh;
-      chainSize = chain.size;
-      chainInfo = {
-        innerTopY: chain.innerTopY,
-        innerBottomY: chain.innerBottomY,
-        bailHeight: chain.bailHeight,
-        chainThickness: chain.chainThickness,
-        bailZCenter: chain.bailZCenter,
-        bailXCenter: chain.bailXCenter
-      };
-      chainMesh.scale.setScalar(newState.chainScale);
-      chainMesh.visible = !newState.hideChain;
-      scene.add(chainMesh);
       if (newState.chainType === 'twisted-star') {
         newState.pendantOffsetX = 0;
         newState.pendantOffsetY = -3;
@@ -375,11 +398,20 @@ const state = initUI(async (newState, changedKey) => {
         newState.pendantOffsetY = -4;
         newState.pendantOffsetZ = 2;
       }
+      await ensureChain(newState);
       window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: newState }));
       await rebuildPendant(newState);
     } catch (err) {
       console.error('Failed to load chain:', err);
+      reportError(`Chain failed to load: ${err && err.message ? err.message : err}`, 'chainType');
     }
+    return;
+  }
+
+  // Presets, undo/redo, examples, saved designs and Reset All replace
+  // every setting at once, including the chain.
+  if (changedKey === 'reset') {
+    await applyFullState(newState);
     return;
   }
 
@@ -511,7 +543,7 @@ if (exportBtn) exportBtn.addEventListener('click', async () => {
       const res = await fetch('/api/export-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadId, designName, format })
+        body: JSON.stringify({ uploadId, designName, format, source: currentSource() })
       });
 
       if (!res.ok) {
@@ -555,7 +587,8 @@ if (clearFixedDiameterBtn) {
   });
 }
 
-// Order pricing: $25 each, buy 3 get 1 free (25% off every 4)
+// Order pricing: $25 each; every 4th chain in the order is free, across
+// all designs (the server computes the real price).
 const UNIT_PRICE = 2500; // cents
 
 function computeOrderPricing(qty) {
@@ -567,44 +600,8 @@ function computeOrderPricing(qty) {
   return { totalCents, paidItems, freeItems, savings };
 }
 
-function updateOrderPriceDisplay() {
-  if (!orderQuantityInput || !orderModalPrice) return;
-  const qty = Math.max(1, parseInt(orderQuantityInput.value) || 1);
-  const { totalCents, freeItems, savings } = computeOrderPricing(qty);
-  const total = (totalCents / 100).toFixed(2);
-  orderModalPrice.innerHTML = `$${total} <span>+ free shipping</span>`;
-  if (freeItems > 0) {
-    orderDiscountNote.textContent = `Buy 3 get 1 free! ${freeItems} free chain${freeItems > 1 ? 's' : ''} — you save $${(savings / 100).toFixed(2)}`;
-  } else if (qty >= 2) {
-    orderDiscountNote.textContent = `Add ${4 - qty} more for a free chain!`;
-  } else {
-    orderDiscountNote.textContent = '';
-  }
-}
-
-if (qtyMinus) {
-  qtyMinus.addEventListener('click', () => {
-    const cur = parseInt(orderQuantityInput.value) || 1;
-    if (cur > 1) { orderQuantityInput.value = cur - 1; updateOrderPriceDisplay(); }
-  });
-}
-if (qtyPlus) {
-  qtyPlus.addEventListener('click', () => {
-    const cur = parseInt(orderQuantityInput.value) || 1;
-    if (cur < 99) { orderQuantityInput.value = cur + 1; updateOrderPriceDisplay(); }
-  });
-}
-if (orderQuantityInput) {
-  orderQuantityInput.addEventListener('input', updateOrderPriceDisplay);
-}
-
-// Order This Chain — opens modal, then sends to Stripe Checkout
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function safeHexColor(c) {
-  return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888';
 }
 
 function buildDesignDetails(st) {
@@ -623,103 +620,233 @@ function buildDesignDetails(st) {
   parts.push(`Shape: ${st.pendantShape}`);
   if (st.useCustomColor && st.customColor) parts.push(`Pendant color: ${st.customColor}`);
   if (st.pendantShape === 'outline' && st.outlineBottomColor) parts.push(`Outline base color: ${st.outlineBottomColor}`);
-  parts.push(`Chain: ${st.material}${st.twoTone ? ` + ${st.chainMaterial} (two-tone)` : ''}`);
+  parts.push(`Chain: ${st.chainType === 'twisted-star' ? 'Twisted Star' : 'Cuban link'}, ${st.material}${st.twoTone ? ` + ${st.chainMaterial} (two-tone)` : ''}`);
   if (st.matteFinish) parts.push('Finish: matte');
   if (st.engrave) parts.push('Engraved text');
   return parts.join('\n');
 }
 
-if (orderBtn) {
-  orderBtn.addEventListener('click', () => {
-    const lines = [state.text, state.secondLineText, state.thirdLineText].filter(Boolean);
-    const designName = lines.join(' / ') || 'Custom Chain';
-    const details = buildDesignDetails(state);
-
-    if (orderQuantityInput) orderQuantityInput.value = 1;
-    if (orderCommentsInput) orderCommentsInput.value = '';
-    updateOrderPriceDisplay();
-
-    let detailsHtml =
-      `<strong>Design:</strong> ${esc(designName)}<br>` +
-      `<strong>Shape:</strong> ${esc(state.pendantShape)}<br>` +
-      `<strong>Material look:</strong> ${esc(state.material)}` +
-      (state.twoTone ? ` / chain: ${esc(state.chainMaterial)}` : '') + `<br>`;
-
-    const colorLabels = [
-      { text: state.text, color: state.lineColor1 },
-      { text: state.secondLineText, color: state.lineColor2 },
-      { text: state.thirdLineText, color: state.lineColor3 }
-    ].filter(e => e.text && e.color);
-
-    if (colorLabels.length > 0) {
-      detailsHtml += `<strong>Text colors:</strong> `;
-      detailsHtml += colorLabels.map(e =>
-        `"${esc(e.text)}" <span style="display:inline-block;width:12px;height:12px;background:${safeHexColor(e.color)};border-radius:2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span> ${esc(e.color)}`
-      ).join(', ') + `<br>`;
-    }
-
-    detailsHtml += `<strong>Note:</strong> All chains are 3D printed in high-quality plastic with a ${esc(state.material)}-tone finish.`;
-    detailsHtml += warningsHtml();
-    track('order_click');
-
-    orderModalDetails.innerHTML = detailsHtml;
-    orderModal.classList.add('open');
-
-    const goHandler = async () => {
-      orderModalGo.disabled = true;
-      orderModalGo.textContent = 'PREPARING...';
-
-      const qty = Math.max(1, parseInt(orderQuantityInput?.value) || 1);
-      const { totalCents } = computeOrderPricing(qty);
-      const comments = orderCommentsInput?.value?.trim() || '';
-
-      try {
-        if (!pendantGroup) {
-          csAlert('No pendant to export.');
-          orderModalGo.disabled = false;
-          orderModalGo.textContent = 'PROCEED TO CHECKOUT';
-          return;
-        }
-        const uploadId = await uploadModel(buildModel('stl'), 'stl');
-        const shareUrl = stateToShareUrl(state);
-
-        const res = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uploadId,
-            format: 'stl',
-            designName,
-            designDetails: details,
-            quantity: qty,
-            comments,
-            shareUrl
-          })
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Server error' }));
-          throw new Error(err.error || 'Checkout failed');
-        }
-
-        const { url } = await res.json();
-        savePendingDesign();
-        window.location.href = url;
-      } catch (err) {
-        console.error('Order failed:', err);
-        csAlert('Failed to start checkout: ' + err.message);
-        orderModalGo.disabled = false;
-        orderModalGo.textContent = 'PROCEED TO CHECKOUT';
-      }
-
-      orderModalGo.removeEventListener('click', goHandler);
-    };
-
-    orderModalGo.disabled = false;
-    orderModalGo.textContent = 'PROCEED TO CHECKOUT';
-    orderModalGo.addEventListener('click', goHandler, { once: true });
-  });
+function pendantPicture(opts) {
+  return capturePendant({ renderer, scene, camera, controls, target: pendantGroup }, opts);
 }
+
+let cart = loadCart();
+
+function cartQuantity() {
+  return cart.reduce((n, it) => n + (it.quantity || 1), 0);
+}
+
+function updateCartBadge() {
+  const badge = document.getElementById('cart-count');
+  if (!badge) return;
+  const designs = cart.length;
+  badge.hidden = designs === 0;
+  badge.textContent = designs ? String(cartQuantity()) : '';
+  orderBtn?.setAttribute('aria-label', designs
+    ? `Your order: ${cartQuantity()} chain${cartQuantity() === 1 ? '' : 's'}`
+    : 'Order this chain printed');
+}
+
+// Turn the design on screen into an order item.
+async function makeCartItem() {
+  const snap = snapshot(state);
+  const item = {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    key: designKey(snap),
+    state: snap,
+    designName: designTitle(state),
+    designDetails: buildDesignDetails(state),
+    shareUrl: stateToShareUrl(state),
+    thumb: pendantPicture({ width: 192, height: 144, quality: 0.72 }),
+    warnings: printabilityWarnings(state, computeDimensions(pendantGroup)),
+    quantity: 1
+  };
+  // An image relief or imported STL can't be rebuilt from saved
+  // settings, so upload this design's model now.
+  if (hasUnsavableParts(state)) {
+    item.uploadId = await uploadModel(buildModel('stl'), 'stl');
+    item.uploadedAt = Date.now();
+  }
+  return item;
+}
+
+function currentInCart() {
+  const key = designKey(snapshot(state));
+  return cart.some((it) => it.key === key);
+}
+
+async function addCurrentToCart() {
+  if (!pendantGroup) return false;
+  if (currentInCart()) return true;
+  if (cart.length >= MAX_CART_DESIGNS) {
+    await csAlert(`An order can hold up to ${MAX_CART_DESIGNS} designs.`);
+    return false;
+  }
+  try {
+    cart.push(await makeCartItem());
+  } catch (err) {
+    await csAlert('Could not add this design: ' + err.message);
+    return false;
+  }
+  if (!saveCart(cart)) showToast('Your order is too large to keep after a reload.');
+  updateCartBadge();
+  return true;
+}
+
+function renderCart() {
+  const list = document.getElementById('cart-items');
+  const addBtn = document.getElementById('cart-add-current');
+  if (!list) return;
+  list.innerHTML = '';
+  if (addBtn) addBtn.hidden = !pendantGroup || currentInCart() || cart.length >= MAX_CART_DESIGNS;
+
+  if (cart.length === 0) {
+    list.appendChild(el('p', { class: 'cs-empty' }, 'Your order is empty.'));
+  }
+  cart.forEach((it, i) => {
+    const qty = el('span', {}, String(it.quantity || 1));
+    const change = (d) => {
+      it.quantity = Math.min(99, Math.max(1, (it.quantity || 1) + d));
+      saveCart(cart);
+      renderCart();
+      updateCartBadge();
+    };
+    list.appendChild(el('div', { class: 'cart-item' },
+      it.thumb ? el('img', { src: it.thumb, alt: `Preview of ${it.designName}` }) : el('div', {}),
+      el('div', {},
+        el('div', { class: 'cart-item-name' }, it.designName),
+        it.warnings && it.warnings.length
+          ? el('div', { class: 'cart-item-warn', title: it.warnings.join('\n') }, `Print check: ${it.warnings.length} note${it.warnings.length > 1 ? 's' : ''}`)
+          : null,
+        el('div', { class: 'cart-item-meta' },
+          el('button', { type: 'button', onclick: () => editCartItem(i) }, 'Edit'),
+          el('button', { type: 'button', onclick: () => { cart.splice(i, 1); saveCart(cart); renderCart(); updateCartBadge(); } }, 'Remove'))
+      ),
+      el('div', { class: 'cart-qty' },
+        el('button', { type: 'button', 'aria-label': 'One fewer', onclick: () => change(-1) }, '−'),
+        qty,
+        el('button', { type: 'button', 'aria-label': 'One more', onclick: () => change(1) }, '+'))
+    ));
+  });
+
+  const qty = cartQuantity();
+  const { totalCents, freeItems, savings } = computeOrderPricing(qty);
+  orderModalPrice.innerHTML = qty
+    ? `$${(totalCents / 100).toFixed(2)} <span>for ${qty} chain${qty > 1 ? 's' : ''} + free shipping</span>`
+    : '';
+  const note = document.getElementById('order-discount-note');
+  if (note) {
+    note.textContent = freeItems > 0
+      ? `${freeItems} free chain${freeItems > 1 ? 's' : ''}: you save $${(savings / 100).toFixed(2)}`
+      : qty > 0 ? `Add ${4 - (qty % 4)} more for a free chain. Different names are fine.` : '';
+  }
+  if (orderModalGo) {
+    orderModalGo.disabled = qty === 0;
+    orderModalGo.textContent = 'Checkout';
+  }
+}
+
+async function editCartItem(i) {
+  const it = cart[i];
+  if (!it) return;
+  cart.splice(i, 1);
+  saveCart(cart);
+  updateCartBadge();
+  orderModal.classList.remove('open');
+  window.dispatchEvent(new CustomEvent('load-preset', { detail: { ...DEFAULTS, ...it.state, reliefData: null, customSTLGeometry: null } }));
+  showToast('Loaded into the designer. Press Order to add it back.');
+}
+
+async function openCart() {
+  track('order_click');
+  if (cart.length === 0) await addCurrentToCart();
+  renderCart();
+  orderModal.classList.add('open');
+}
+
+if (orderBtn) orderBtn.addEventListener('click', () => { openCart(); });
+document.getElementById('cart-add-current')?.addEventListener('click', async () => {
+  await addCurrentToCart();
+  renderCart();
+});
+
+function setLoadingMessage(text) {
+  loading.querySelector('p').textContent = text;
+  loading.classList.toggle('hidden', !text);
+}
+
+// Build and upload a model for every design in the order, then go to
+// Stripe. Designs are rebuilt one by one in the 3D view (behind a
+// "Preparing" screen) and the design on screen is restored afterwards.
+async function checkoutCart() {
+  if (!cart.length) return;
+  const STALE_MS = 3.5 * 60 * 60 * 1000;
+  const stale = cart.find((it) => it.uploadId && Date.now() - (it.uploadedAt || 0) > STALE_MS);
+  if (stale) {
+    await csAlert(`"${esc(stale.designName)}" uses an uploaded image or STL and was added too long ago. Remove it, reopen that design and add it again.`);
+    return;
+  }
+
+  orderModalGo.disabled = true;
+  const live = { ...state };
+  const items = [];
+  try {
+    for (let i = 0; i < cart.length; i++) {
+      const it = cart[i];
+      orderModalGo.textContent = `Preparing design ${i + 1} of ${cart.length}…`;
+      let uploadId = it.uploadId;
+      if (!uploadId) {
+        setLoadingMessage(`Preparing your order (${i + 1} of ${cart.length})…`);
+        Object.assign(state, { ...DEFAULTS, ...it.state, reliefData: null, customSTLGeometry: null });
+        await applyFullState(state);
+        uploadId = await uploadModel(buildModel('stl'), 'stl');
+      }
+      items.push({
+        uploadId, format: 'stl', designName: it.designName, designDetails: it.designDetails,
+        shareUrl: it.shareUrl, quantity: it.quantity || 1
+      });
+    }
+  } catch (err) {
+    console.error('Order preparation failed:', err);
+    reportError(`Order preparation failed: ${err.message}`, 'checkout');
+    await csAlert('Failed to prepare your order: ' + err.message);
+    orderModalGo.disabled = false;
+    orderModalGo.textContent = 'Checkout';
+    return;
+  } finally {
+    Object.assign(state, live);
+    await applyFullState(state);
+    window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: state }));
+    setLoadingMessage('');
+  }
+
+  try {
+    orderModalGo.textContent = 'Opening checkout…';
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items,
+        comments: orderCommentsInput?.value?.trim() || '',
+        source: currentSource()
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Server error' }));
+      throw new Error(err.error || 'Checkout failed');
+    }
+    const { url } = await res.json();
+    savePendingDesign();
+    window.location.href = url;
+  } catch (err) {
+    console.error('Order failed:', err);
+    await csAlert('Failed to start checkout: ' + err.message);
+    orderModalGo.disabled = false;
+    orderModalGo.textContent = 'Checkout';
+  }
+}
+
+if (orderModalGo) orderModalGo.addEventListener('click', () => { checkoutCart(); });
 
 if (orderModalCancel) {
   orderModalCancel.addEventListener('click', () => {
@@ -739,6 +866,10 @@ if (orderModal) {
   const params = new URLSearchParams(window.location.search);
   const orderStatus = params.get('order');
   if (orderStatus === 'success' || orderStatus === 'cancelled') {
+    if (orderStatus === 'success') {
+      clearCart();
+      cart = [];
+    }
     // Clean the URL
     const url = new URL(window.location.href);
     url.searchParams.delete('order');
@@ -816,34 +947,87 @@ if (resetBtn) {
   });
 }
 
-// Save preset
+// Save design / My designs (kept in this browser)
 if (savePresetBtn) {
   savePresetBtn.addEventListener('click', async () => {
-    const name = await csPrompt('Preset name:');
+    const name = await csPrompt('Name this design:', designTitle(state));
     if (!name) return;
-    const presets = JSON.parse(localStorage.getItem('necklace_presets') || '{}');
-    const saveState = { ...state };
-    delete saveState.reliefData;
-    delete saveState.customSTLGeometry;
-    presets[name] = saveState;
-    localStorage.setItem('necklace_presets', JSON.stringify(presets));
-    window.dispatchEvent(new CustomEvent('presets-updated'));
+    const ok = addSaved({
+      id: `d${Date.now().toString(36)}`,
+      name: String(name).slice(0, 60),
+      state: snapshot(state),
+      thumb: pendantPicture({ width: 320, height: 240, quality: 0.72 }),
+      savedAt: new Date().toISOString()
+    });
+    showToast(ok ? 'Saved to My designs.' : 'Could not save: this browser\'s storage is full.');
+    if (hasUnsavableParts(state)) showToast('Note: uploaded images and STL files are not saved with designs.');
   });
 }
 
-// Load preset
-if (loadPresetBtn) {
-  loadPresetBtn.addEventListener('click', async () => {
-    const presets = JSON.parse(localStorage.getItem('necklace_presets') || '{}');
-    const names = Object.keys(presets);
-    if (names.length === 0) {
-      await csAlert('No saved presets.');
-      return;
-    }
-    const name = await csPrompt('Load preset:<br><span style="font-size:12px;color:var(--text-dim)">' + names.join(', ') + '</span>');
-    if (!name || !presets[name]) return;
-    window.dispatchEvent(new CustomEvent('load-preset', { detail: presets[name] }));
-  });
+function loadDesignIntoView(designState) {
+  window.dispatchEvent(new CustomEvent('load-preset', {
+    detail: { ...DEFAULTS, ...designState, reliefData: null, customSTLGeometry: null }
+  }));
+}
+
+function showMyDesigns() {
+  const saved = loadSaved();
+  const grid = el('div', { class: 'cs-grid' });
+  if (!saved.length) {
+    openSheet('My designs', el('p', { class: 'cs-empty' }, 'Nothing saved yet. Use "Save design" to keep a design in this browser.'));
+    return;
+  }
+  for (const d of saved) {
+    grid.appendChild(el('div', { class: 'cs-tile' },
+      d.thumb ? el('img', { src: d.thumb, alt: `Preview of ${d.name}` }) : el('img', { alt: '', src: '/favicon.svg' }),
+      el('div', { class: 'cs-tile-body' },
+        el('strong', {}, d.name),
+        d.savedAt ? new Date(d.savedAt).toLocaleDateString() : 'Saved preset'),
+      el('div', { class: 'cs-tile-actions' },
+        el('button', { type: 'button', onclick: () => { closeSheet(); loadDesignIntoView(d.state); } }, 'Open'),
+        el('button', { type: 'button', onclick: async () => {
+          if (await csConfirm(`Delete "${esc(d.name)}"?`)) { removeSaved(d.id); showMyDesigns(); }
+        } }, 'Delete'))
+    ));
+  }
+  openSheet('My designs', el('div', {},
+    el('p', { class: 'cs-empty' }, 'Saved in this browser only.'), grid));
+}
+
+if (loadPresetBtn) loadPresetBtn.addEventListener('click', showMyDesigns);
+
+// ---------- Start from an example ----------
+function showExamples() {
+  const grid = el('div', { class: 'cs-grid' });
+  for (const g of GALLERY) {
+    grid.appendChild(el('button', {
+      type: 'button', class: 'cs-tile',
+      onclick: async () => {
+        if (!(await csConfirm(`Replace the design on screen with "${esc(g.title)}"?`))) return;
+        closeSheet();
+        loadDesignIntoView(g.state);
+      }
+    },
+      el('img', { src: `/gallery/${g.slug}-close.jpg`, alt: g.title, loading: 'lazy' }),
+      el('div', { class: 'cs-tile-body' }, el('strong', {}, g.title), g.blurb)));
+  }
+  openSheet('Start from an example', grid);
+}
+document.getElementById('examples-btn')?.addEventListener('click', showExamples);
+
+// ---------- Advanced settings switch ----------
+{
+  const toggle = document.getElementById('advanced-toggle');
+  let on = false;
+  try { on = localStorage.getItem('cs_advanced') === '1'; } catch {}
+  document.body.classList.toggle('show-advanced', on);
+  if (toggle) {
+    toggle.checked = on;
+    toggle.addEventListener('change', () => {
+      document.body.classList.toggle('show-advanced', toggle.checked);
+      try { localStorage.setItem('cs_advanced', toggle.checked ? '1' : '0'); } catch {}
+    });
+  }
 }
 
 const MAX_UPLOAD_MB = 10;
@@ -1084,10 +1268,31 @@ function showToast(message) {
   setTimeout(() => toast.remove(), 3000);
 }
 
+async function shortShareUrl(longUrl) {
+  const i = longUrl.indexOf('#design=');
+  if (i === -1) return longUrl; // the default design: no need for a link
+  try {
+    const res = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        design: longUrl.slice(i + 8),
+        image: pendantPicture({ width: 1200, height: 630, quality: 0.82, pad: 2.5 })
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()).url || longUrl;
+  } catch {
+    return longUrl;
+  }
+}
+
 if (shareBtn) {
   shareBtn.addEventListener('click', async () => {
-    const url = stateToShareUrl(state);
     track('share');
+    shareBtn.disabled = true;
+    const url = await shortShareUrl(stateToShareUrl(state));
+    shareBtn.disabled = false;
     try {
       await navigator.clipboard.writeText(url);
       showToast('Share link copied to clipboard!');
@@ -1098,29 +1303,9 @@ if (shareBtn) {
   });
 }
 
-// --- Preview thumbnail in order modal ---
-function capturePreviewThumbnail() {
-  if (!orderPreviewWrap) return;
-  orderPreviewWrap.innerHTML = '';
-  renderer.render(scene, camera);
-  const source = renderer.domElement;
-  const canvas = document.createElement('canvas');
-  const maxW = 280;
-  const scale = maxW / source.width;
-  canvas.width = maxW;
-  canvas.height = Math.round(source.height * scale);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-  orderPreviewWrap.appendChild(canvas);
-}
-
-// Hook into order button to capture thumbnail when modal opens
-if (orderBtn) {
-  orderBtn.addEventListener('click', () => {
-    setTimeout(capturePreviewThumbnail, 50);
-  });
-}
+initSheet();
+initFontPickers();
+updateCartBadge();
 
 (async () => {
   await initPremium();
@@ -1147,6 +1332,7 @@ if (orderBtn) {
   if (restored) {
     window.dispatchEvent(new CustomEvent('sync-ui-only', { detail: state }));
   }
+  syncFontPickers();
 
   // Push initial state into undo history
   undoRedo.pushState(state);

@@ -63,6 +63,29 @@ function designDetailsBlock(details) {
   return `<table style="width:100%;margin:8px 0 12px;">${rows}</table>`;
 }
 
+// The designs in an order: `items` for multi-design orders, otherwise
+// the single design stored on the order itself.
+function orderItems(order) {
+  if (Array.isArray(order.items) && order.items.length) return order.items;
+  return [{ designName: order.designName, designDetails: order.designDetails,
+    shareUrl: order.shareUrl, quantity: order.quantity || 1 }];
+}
+
+function itemsBlock(order, { admin = false, baseUrl = '' } = {}) {
+  const items = orderItems(order);
+  const multi = items.length > 1;
+  return items.map((it, i) => {
+    const heading = multi
+      ? `<h3 style="margin:16px 0 4px;">Design ${i + 1}: ${escapeHtml(it.designName)} &times; ${it.quantity || 1}</h3>`
+      : (admin ? '<h3>Design Details:</h3>' : '');
+    const links = admin ? [
+      it.shareUrl ? `<a href="${escapeHtml(it.shareUrl)}">View design in editor</a>` : '',
+      `<a href="${baseUrl}/admin/api/orders/${escapeHtml(order.id)}/stl${multi ? `?item=${i + 1}` : ''}">Download model file</a>`
+    ].filter(Boolean).join(' &middot; ') : '';
+    return `${heading}${designDetailsBlock(it.designDetails) || ''}${links ? `<p>${links}</p>` : ''}`;
+  }).join('');
+}
+
 function shippingBlock(shipping) {
   if (!shipping || !shipping.address) return '<p>No shipping address collected.</p>';
   const a = shipping.address;
@@ -112,7 +135,7 @@ export async function sendOrderConfirmation(order) {
           </tr>
         </table>
 
-        ${designDetailsBlock(order.designDetails)}
+        ${itemsBlock(order)}
 
         ${order.comments ? `<div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;margin:12px 0;">
           <p style="margin:0 0 4px;font-size:12px;color:#666;text-transform:uppercase;font-weight:600;">Your Comments</p>
@@ -123,7 +146,7 @@ export async function sendOrderConfirmation(order) {
         ${shippingBlock(order.shipping)}
 
         <p style="margin-top: 24px; font-size: 13px; color: #666;">
-          We'll email you again when your chain ships with a tracking number.
+          We'll email you again when your order ships with a tracking number.
           Questions? Just reply to this email.
         </p>
       </div>
@@ -155,8 +178,9 @@ export async function sendAdminNotification(order) {
       <p><strong>Quantity:</strong> ${order.quantity || 1}</p>
       <p><strong>Total:</strong> ${formatMoney(order.amountTotal, order.currency)}</p>
 
-      <h3>Design Details:</h3>
-      ${designDetailsBlock(order.designDetails) || `<p>${safeDesignDetails || '—'}</p>`}
+      ${order.source ? `<p><strong>Came from:</strong> ${escapeHtml(order.source)}</p>` : ''}
+      ${order.discountTotal ? `<p><strong>Promo discount:</strong> ${formatMoney(order.discountTotal, order.currency)}</p>` : ''}
+      ${itemsBlock(order, { admin: true, baseUrl }) || `<p>${safeDesignDetails || '—'}</p>`}
 
       ${order.comments ? `<h3>Customer Comments:</h3>
       <div style="background:#fffbe6;border:1px solid #e6c200;border-radius:6px;padding:12px;margin:8px 0;">
@@ -165,8 +189,6 @@ export async function sendAdminNotification(order) {
 
       <h3>Ship to:</h3>
       ${shippingBlock(order.shipping)}
-      ${order.shareUrl ? `<p><a href="${escapeHtml(order.shareUrl)}">View design in editor</a></p>` : ''}
-      <p><a href="${baseUrl}/admin/api/orders/${escapeHtml(order.id)}/stl">Download model file</a></p>
       <p><a href="${baseUrl}/admin">Open admin dashboard</a></p>
     </div>
   `;

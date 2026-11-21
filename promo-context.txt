@@ -134,7 +134,10 @@ ACTIONS & SHARING
 - Screenshot: download a PNG of the current 3D viewport (watermark-free)
 - Share Design: generates a unique URL that encodes the full design state;
   anyone with the link sees the exact same design — no account needed
-- Save Preset / Load Preset: save and restore designs locally
+- Start from an example: 8 ready-made designs to customize
+- Save design / My designs: keep designs (with pictures) in this browser
+- Share links are short and show a picture of the design in chats and
+  social posts
 - Undo / Redo with keyboard shortcuts (Ctrl+Z / Ctrl+Y)
 - Reset All: restore every setting to defaults
 
@@ -152,7 +155,9 @@ EXPORT
 ORDER A PHYSICAL CHAIN
 ------------------------------------------------------------------------
 - $25 per chain, free shipping
-- Buy 3 get 1 free (25% off every 4th chain)
+- Buy 3 get 1 free across the whole order: each chain can have a different
+  name (add several designs to one order)
+- Promo codes accepted at checkout
 - Quantity selector in the order modal
 - Customer comments field for special instructions
 - Shipping address collected at Stripe Checkout

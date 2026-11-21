@@ -62,7 +62,7 @@ webhookRouter.post('/stripe', async (req, res) => {
       try {
         if (exportId) {
           markExportPaid(exportId);
-          recordEvent('export_paid');
+          recordEvent('export_paid', session.metadata?.source);
           console.log(`Export ${exportId} marked as paid`);
         }
       } catch (err) {
@@ -110,7 +110,10 @@ webhookRouter.post('/stripe', async (req, res) => {
         modelFormat: src.modelFormat || 'stl',
         quantity: parseInt(session.metadata?.quantity) || src.quantity || 1,
         comments: src.comments || '',
-        shareUrl: src.shareUrl || ''
+        shareUrl: src.shareUrl || '',
+        items: src.items || null,
+        source: src.source || session.metadata?.source || '',
+        discountTotal: session.total_details?.amount_discount || 0
       });
     } catch (err) {
       // A paid order we failed to save: answer 500 so Stripe retries
@@ -120,7 +123,7 @@ webhookRouter.post('/stripe', async (req, res) => {
     }
 
     if (ref) deletePending(ref);
-    recordEvent('order_paid');
+    recordEvent('order_paid', order.source);
     console.log(`Order created: ${order.id} for ${order.customerEmail}`);
 
     // Fire-and-forget emails — don't fail the webhook if email breaks.

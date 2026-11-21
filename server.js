@@ -27,6 +27,7 @@ import { webhookRouter, rawBodyMiddleware } from './api/webhooks.js';
 import { ordersRouter } from './api/orders.js';
 import { adminRouter } from './api/admin.js';
 import { pagesRouter } from './api/pages.js';
+import { sharesRouter } from './api/shares.js';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -90,6 +91,9 @@ app.use(express.json({ limit: '50mb' }));
 // API routes
 // -------------------------------------------------------------------
 app.use('/api', ordersRouter);
+
+// Short share links: POST /api/share, GET /d/:id
+app.use(sharesRouter);
 
 // -------------------------------------------------------------------
 // Admin dashboard

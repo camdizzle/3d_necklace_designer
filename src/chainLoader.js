@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { gunzipSync } from 'three/addons/libs/fflate.module.js';
 import { MATERIALS } from './constants.js';
 import { createMaterial } from './pendantGenerator.js';
 
@@ -88,72 +89,103 @@ function findChainAttachPoint(geometry) {
   };
 }
 
+// Chain meshes: a compact .mesh file built by scripts/pack-meshes.js
+// (about 0.7-0.9 MB) with the original STL (6-7 MB) as a fallback.
 const CHAIN_MODELS = {
-  rope: '/chain_loop.stl',
-  'twisted-star': '/Twisted Star Chain.stl',
-  box: '/chain_loop.stl',
-  cuban: '/chain_loop.stl',
-  figaro: '/chain_loop.stl',
-  snake: '/chain_loop.stl'
+  cuban: { mesh: '/meshes/chain_loop.mesh', stl: '/chain_loop.stl' },
+  'twisted-star': { mesh: '/meshes/twisted_star_chain.mesh', stl: '/Twisted Star Chain.stl' }
 };
 
 const CHAIN_ROTATIONS = {
 };
 
-export function loadChain(materialKey = 'gold', chainType = 'rope') {
-  return new Promise((resolve, reject) => {
-    const loader = new STLLoader();
-    const modelFile = CHAIN_MODELS[chainType] || CHAIN_MODELS.rope;
+// Decode a .mesh file (see scripts/pack-meshes.js) into the same
+// unindexed geometry the STL loader produces, so lighting and the
+// attach-point search behave exactly as with the STL.
+export function decodeMesh(arrayBuffer) {
+  let bytes = new Uint8Array(arrayBuffer);
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) bytes = gunzipSync(bytes);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  if (magic !== 'CSM1') throw new Error('Not a chain mesh file');
+  const vertexCount = view.getUint32(4, true);
+  const indexCount = view.getUint32(8, true);
+  const min = [0, 1, 2].map((a) => view.getFloat32(12 + a * 4, true));
+  const step = [0, 1, 2].map((a) => view.getFloat32(24 + a * 4, true));
+  let offset = 36;
+  const q = new Uint16Array(bytes.slice(offset, offset + vertexCount * 6).buffer);
+  offset += vertexCount * 6;
+  offset += (4 - (offset % 4)) % 4;
+  const indices = new Uint32Array(bytes.slice(offset, offset + indexCount * 4).buffer);
+  if (indices.length !== indexCount) throw new Error('Chain mesh file is truncated');
 
-    loader.load(
-      modelFile,
-      (geometry) => {
-        geometry.computeVertexNormals();
-        geometry.center();
+  const positions = new Float32Array(indexCount * 3);
+  for (let i = 0; i < indexCount; i++) {
+    const v = indices[i] * 3;
+    positions[i * 3] = min[0] + q[v] * step[0];
+    positions[i * 3 + 1] = min[1] + q[v + 1] * step[1];
+    positions[i * 3 + 2] = min[2] + q[v + 2] * step[2];
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  return geometry;
+}
 
-        const rotation = CHAIN_ROTATIONS[chainType];
-        if (rotation) {
-          geometry.rotateZ(rotation);
-          geometry.center();
-        }
+async function fetchChainGeometry(chainType) {
+  const model = CHAIN_MODELS[chainType] || CHAIN_MODELS.cuban;
+  try {
+    const res = await fetch(encodeURI(model.mesh));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return decodeMesh(await res.arrayBuffer());
+  } catch (err) {
+    console.warn(`Compact chain mesh unavailable (${err.message}); loading the STL instead.`);
+    return new STLLoader().loadAsync(encodeURI(model.stl));
+  }
+}
 
-        let attach = findChainAttachPoint(geometry);
+export async function loadChain(materialKey = 'gold', chainType = 'cuban') {
+  const geometry = await fetchChainGeometry(chainType);
+  geometry.computeVertexNormals();
+  geometry.center();
 
-        if (Math.abs(attach.attachX) > 0.01) {
-          geometry.translate(-attach.attachX, 0, 0);
-          attach = findChainAttachPoint(geometry);
-        }
+  const rotation = CHAIN_ROTATIONS[chainType];
+  if (rotation) {
+    geometry.rotateZ(rotation);
+    geometry.center();
+  }
 
-        const mat = MATERIALS[materialKey];
-        const material = new THREE.MeshStandardMaterial({
-          color: mat.color,
-          metalness: mat.metalness,
-          roughness: mat.roughness,
-          envMapIntensity: mat.envMapIntensity
-        });
+  let attach = findChainAttachPoint(geometry);
 
-        const mesh = new THREE.Mesh(geometry, material);
+  if (Math.abs(attach.attachX) > 0.01) {
+    geometry.translate(-attach.attachX, 0, 0);
+    attach = findChainAttachPoint(geometry);
+  }
 
-        const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
-        const size = box.getSize(new THREE.Vector3());
-
-        resolve({
-          mesh,
-          geometry,
-          size,
-          attachPoint: attach.attachPoint,
-          innerTopY: attach.innerTopY,
-          innerBottomY: attach.innerBottomY,
-          bailHeight: attach.bailHeight,
-          chainThickness: size.z,
-          bailZCenter: attach.bailZCenter,
-          bailXCenter: attach.bailXCenter
-        });
-      },
-      undefined,
-      (error) => reject(error)
-    );
+  const mat = MATERIALS[materialKey] || MATERIALS.gold;
+  const material = new THREE.MeshStandardMaterial({
+    color: mat.color,
+    metalness: mat.metalness,
+    roughness: mat.roughness,
+    envMapIntensity: mat.envMapIntensity
   });
+
+  const mesh = new THREE.Mesh(geometry, material);
+
+  const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+  const size = box.getSize(new THREE.Vector3());
+
+  return {
+    mesh,
+    geometry,
+    size,
+    attachPoint: attach.attachPoint,
+    innerTopY: attach.innerTopY,
+    innerBottomY: attach.innerBottomY,
+    bailHeight: attach.bailHeight,
+    chainThickness: size.z,
+    bailZCenter: attach.bailZCenter,
+    bailXCenter: attach.bailXCenter
+  };
 }
 
 export function updateChainMaterial(mesh, materialKey) {

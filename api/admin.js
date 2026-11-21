@@ -6,6 +6,7 @@
 //   PUT  /admin/api/orders/:id — update order status/tracking
 //   GET  /admin/api/orders/:id/stl — download the order's model file
 //   GET  /admin/api/stats  — funnel counters (last 30 days)
+//   GET  /admin/api/client-errors — recent errors from visitors' browsers
 //   GET  /admin/api/backup — JSON backup of all orders
 
 import express from 'express';
@@ -15,7 +16,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import {
   listOrders, getOrder, updateOrder, isValidOrderId,
-  normalizeFormat, getStats, buildBackup, ORDERS_DIR
+  getStats, buildBackup, ORDERS_DIR, orderModelName, getClientErrors
 } from './orders.js';
 import { sendShippingNotification } from './email.js';
 
@@ -26,7 +27,29 @@ export const adminRouter = express.Router();
 // -----------------------------------------------------------------
 // HTTP Basic Auth middleware
 // -----------------------------------------------------------------
+// Lock an address out for 15 minutes after 10 failed logins.
+const failedLogins = new Map(); // ip -> { count, reset }
+const MAX_FAILED_LOGINS = 10;
+const LOCKOUT_MS = 15 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, e] of failedLogins) if (now > e.reset) failedLogins.delete(ip);
+}, LOCKOUT_MS).unref();
+
+function noteFailedLogin(ip) {
+  const now = Date.now();
+  const e = failedLogins.get(ip);
+  if (!e || now > e.reset) failedLogins.set(ip, { count: 1, reset: now + LOCKOUT_MS });
+  else e.count++;
+}
+
 function requireAuth(req, res, next) {
+  const ip = req.ip || 'unknown';
+  const lock = failedLogins.get(ip);
+  if (lock && lock.count >= MAX_FAILED_LOGINS && Date.now() < lock.reset) {
+    return res.status(429).send('Too many failed logins. Try again in 15 minutes.');
+  }
+
   const user = process.env.ADMIN_USERNAME || 'admin';
   const pass = process.env.ADMIN_PASSWORD;
 
@@ -51,9 +74,11 @@ function requireAuth(req, res, next) {
     crypto.timingSafeEqual(Buffer.from(p), Buffer.from(pass));
 
   if (valid) {
+    failedLogins.delete(ip);
     return next();
   }
 
+  noteFailedLogin(ip);
   res.setHeader('WWW-Authenticate', 'Basic realm="Chain Studio Admin"');
   return res.status(401).send('Invalid credentials');
 }
@@ -108,21 +133,29 @@ adminRouter.put('/api/orders/:id', async (req, res) => {
   res.json(updated);
 });
 
-// Download the model file for an order
+// Download the model file for an order (?item=N for design N of a
+// multi-design order, 1-based)
 adminRouter.get('/api/orders/:id/stl', (req, res) => {
   // Validate order ID format to prevent path traversal
   if (!isValidOrderId(req.params.id)) {
     return res.status(400).json({ error: 'Invalid order ID format' });
   }
   const order = getOrder(req.params.id);
-  const format = normalizeFormat(order?.modelFormat);
-  const file = path.join(ORDERS_DIR, `${req.params.id}.${format}`);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  const index = Math.max(0, (parseInt(req.query.item) || 1) - 1);
+  const name = orderModelName(order, index);
+  const file = path.join(ORDERS_DIR, name);
   if (!fs.existsSync(file)) {
     return res.status(404).json({ error: 'Model file not found for this order' });
   }
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${req.params.id}.${format}"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
   fs.createReadStream(file).pipe(res);
+});
+
+// Recent errors reported by visitors' browsers
+adminRouter.get('/api/client-errors', (_req, res) => {
+  res.json(getClientErrors());
 });
 
 // Funnel counters for the last 30 days
